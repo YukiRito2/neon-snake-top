@@ -58,6 +58,8 @@
     padding:5px 16px;border-radius:999px;background:rgba(0,0,0,.72);border:1px solid hsla(var(--h),100%,60%,.55);
     box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:20px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
   #legend.hidden{display:none}
+  #fx2{pointer-events:none;z-index:3}
+  body.noir > *:not(#fx2):not(script){filter:grayscale(1) contrast(1.15) brightness(.88)}
   #pauseMenu{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;
     background:rgba(0,0,0,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
   #pauseMenu.show{display:flex;animation:pmIn .25s ease-out}
@@ -90,6 +92,7 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<canvas id="fx2"></canvas>
 
 <div id="hud">
   <div class="hi">🏆 <b id="winV">0</b> <span class="sm">VICTORIAS</span> <b id="streakV"></b></div>
@@ -176,7 +179,7 @@
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
-const cvs = $('c'), ctx = cvs.getContext('2d');
+const cvs = $('c'), ctx = cvs.getContext('2d'), fx2 = $('fx2'), f2 = fx2.getContext('2d');
 const g1 = document.createElement('canvas'), g1x = g1.getContext('2d'); // glow 1/4
 const g2 = document.createElement('canvas'), g2x = g2.getContext('2d'); // glow 1/8
 const bg = document.createElement('canvas'), bgx = bg.getContext('2d');
@@ -210,7 +213,7 @@ let fbuf, cur, vis, dist, prev, q, foodMap, stamp=0, lastCount=0;
 function layout(){
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth; H = window.innerHeight;
-  cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
+  cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR); fx2.width = cvs.width; fx2.height = cvs.height;
   const top = W <= 520 ? 84 : 58, pad = 6, bot = S.legend ? (W <= 520 ? 56 : 48) : pad, aw = W - pad*2, ah = H - top - bot;
   cell = Math.max(6, Math.floor(Math.min(aw, ah) / S.grid));
   let nc = Math.max(6, Math.floor(aw/cell)), nr = Math.max(6, Math.floor(ah/cell));
@@ -337,6 +340,7 @@ function eat(fi){
   const px = ox + (f.x+.5)*cell, py = oy + (f.y+.5)*cell;
   burst(px, py, f.hue, f.mega ? 110 : (bot ? 26 : 40), f.mega ? 8 : 5);
   burst(px, py, (f.hue+180)%360, f.mega ? 30 : 8, 2, 2);
+  if (modIs('cine')) noirSpark(px, py, f.mega ? 60 : 14);
   ring(px, py, f.hue, cell*(f.mega ? 9 : 4), f.mega ? 5 : 3);
   if (f.mega){ ring(px, py, 50, cell*14, 3); }
   shake = Math.max(shake, f.mega ? 14 : (bot ? 3 : 6));
@@ -716,8 +720,62 @@ function startMod(){
 }
 function applyMod(m){
   mod = m; modShowAt = now; modT = 4000;
-  document.documentElement.style.filter = modIs('cine') ? 'grayscale(1) contrast(1.25) brightness(1.05)' : '';
+  document.body.classList.toggle('noir', modIs('cine')); noirOn = true;
   if (modIs('cine')) tone(110, 1.4, 'triangle', .18, 55);
+}
+/* 🎬 Cine negro: el juego en blanco y negro y, en una capa aparte sin filtro, polvo de luz azul
+   que flota, rayos de luz suaves y chispas azules al comer. */
+let noirOn = false, motes = [], noirSparks = [];
+function noirSpark(x, y, n){ for (let i=0;i<n;i++){ const a = Math.random()*6.28, v = 0.6 + Math.random()*2.4;
+  noirSparks.push({ x, y, vx:Math.cos(a)*v, vy:Math.sin(a)*v - 0.6, life:1, r:1 + Math.random()*2.2 }); } if (noirSparks.length > 400) noirSparks.splice(0, noirSparks.length - 400); }
+function drawNoir(dt){
+  if (!modIs('cine')){ if (noirOn){ f2.setTransform(1,0,0,1,0,0); f2.clearRect(0,0,fx2.width,fx2.height); noirOn = false; motes = []; noirSparks = []; } return; }
+  noirOn = true; const k = Math.min(3, dt/16.67), t = now*0.001;
+  f2.setTransform(1,0,0,1,0,0); f2.clearRect(0,0,fx2.width,fx2.height); f2.setTransform(DPR,0,0,DPR,0,0);
+  f2.globalCompositeOperation = 'lighter';
+  // rayos de luz diagonales que respiran despacio
+  for (let i=0;i<3;i++){
+    const a = 0.05 + 0.04*Math.sin(t*0.4 + i*2.1); if (a <= 0) continue;
+    const x0 = W*(0.15 + i*0.33) + Math.sin(t*0.15 + i)*W*0.05;
+    const g = f2.createLinearGradient(x0, 0, x0 + W*0.25, H);
+    g.addColorStop(0, `rgba(205,215,228,${a})`); g.addColorStop(1, 'rgba(205,215,228,0)');
+    f2.fillStyle = g; f2.beginPath(); f2.moveTo(x0 - W*0.05, 0); f2.lineTo(x0 + W*0.06, 0); f2.lineTo(x0 + W*0.35, H); f2.lineTo(x0 + W*0.12, H); f2.closePath(); f2.fill();
+  }
+  // paleta apagada: ceniza gris que cae despacio + motas de luz azul pálido que suben
+  while (motes.length < 80){
+    const ash = motes.length % 3 !== 0, init = motes.length < 79;
+    motes.push({ ash, x: Math.random()*W, y: init ? Math.random()*H : (ash ? -10 : H + 10),
+      r: ash ? 1.2 + Math.random()*2.6 : 1.4 + Math.random()*2.8, vy: ash ? -(0.2 + Math.random()*0.5) : 0.15 + Math.random()*0.4,
+      vx: ash ? 0.15 + Math.random()*0.35 : 0, ph: Math.random()*6.28, tw: 0.5 + Math.random()*1.5, rot: Math.random()*6.28 });
+  }
+  for (const m of motes){
+    m.y -= m.vy*k; m.x += (m.vx + Math.sin(t*0.7 + m.ph)*0.3)*k; m.rot += 0.01*k;
+    if (m.y < -12 || m.y > H + 12 || m.x > W + 12){ m.x = Math.random()*W*(m.ash ? 0.9 : 1) - (m.ash ? W*0.05 : 0); m.y = m.ash ? -10 : H + 10; }
+    if (m.ash){
+      // copos de ceniza: grises, sin brillo, ligeramente alargados
+      const al = 0.4 + 0.2*Math.sin(t*m.tw + m.ph);
+      f2.globalCompositeOperation = 'source-over';
+      f2.save(); f2.translate(m.x, m.y); f2.rotate(m.rot); f2.fillStyle = `rgba(190,192,198,${al})`;
+      f2.beginPath(); f2.ellipse(0, 0, m.r*1.4, m.r*0.7, 0, 0, 6.28); f2.fill(); f2.restore();
+    } else {
+      const al = 0.4 + 0.35*Math.sin(t*m.tw*2 + m.ph);
+      f2.globalCompositeOperation = 'lighter';
+      const g = f2.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r*5);
+      g.addColorStop(0, `rgba(165,200,235,${al})`); g.addColorStop(0.3, `rgba(110,150,200,${al*0.45})`); g.addColorStop(1, 'rgba(90,130,190,0)');
+      f2.fillStyle = g; f2.fillRect(m.x - m.r*5, m.y - m.r*5, m.r*10, m.r*10);
+      f2.fillStyle = `rgba(230,238,248,${al})`; f2.beginPath(); f2.arc(m.x, m.y, m.r*0.55, 0, 6.28); f2.fill();
+    }
+  }
+  f2.globalCompositeOperation = 'lighter';
+  // chispas azules (al comer y alrededor de la cabeza)
+  if (snake.length && state === 'play' && Math.random() < 0.25*k){ const h = snake[0]; noirSpark(ox + (h.x+.5)*cell, oy + (h.y+.5)*cell, 1); }
+  for (let i=noirSparks.length-1;i>=0;i--){
+    const p = noirSparks[i]; p.x += p.vx*k; p.y += p.vy*k; p.vx *= Math.pow(0.95, k); p.vy = p.vy*Math.pow(0.95, k) - 0.02*k; p.life -= 0.018*k;
+    if (p.life <= 0){ noirSparks.splice(i,1); continue; }
+    f2.fillStyle = `rgba(160,195,230,${p.life*0.85})`; f2.shadowColor = '#8ab4e0'; f2.shadowBlur = 8;
+    f2.beginPath(); f2.arc(p.x, p.y, p.r*p.life + 0.4, 0, 6.28); f2.fill();
+  }
+  f2.shadowBlur = 0; f2.globalCompositeOperation = 'source-over';
 }
 function rerollMod(){ const pool = MODS.filter(m => m !== mod); applyMod(pool[(Math.random()*pool.length)|0]); }
 function modTick(dt){
@@ -1431,6 +1489,7 @@ function frame(t){
   requestAnimationFrame(frame);
   logic(performance.now());
   render();
+  const rt = performance.now(); drawNoir(Math.min(100, rt - (frame.lt || rt))); frame.lt = rt;
 }
 /* lógica separada del dibujo: así sigue jugando aunque la ventana esté minimizada o tapada */
 function logic(t){
