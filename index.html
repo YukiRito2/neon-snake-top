@@ -686,8 +686,6 @@ const MODS = [
   { id:'noche',    ico:'🌙', name:'NOCHE',    desc:'solo se ve cerca de la cabeza' },
   { id:'suerte',   ico:'🍀', name:'SUERTE',   desc:'la ruleta solo da cosas buenas' },
   { id:'cine',     ico:'🎬', name:'CINE NEGRO', desc:'todo en blanco y negro… y muy serio' },
-  { id:'acuarela', ico:'🎨', name:'ACUARELA', desc:'colores pastel y manchas de pintura' },
-  { id:'retro',    ico:'👾', name:'RETRO',    desc:'píxeles gordos y sonidos de 8 bits' },
   { id:'agua',     ico:'🌊', name:'BAJO EL AGUA', desc:'burbujas, todo ondula y va más lento' }
 ];
 let mod = null, modShowAt = -1e9, modT = 0, voteOpts = [], voters = {};
@@ -1982,7 +1980,7 @@ const CHAT_TIPS = [
   '💬 Escribe en el chat: turbo, lento, apagon, bloque o ruleta ¡y cambia la partida! 🐍 · mascota = mini serpiente con tu nombre 🐣',
   '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = maldición (5 seguidas = 🥀 jardín maldito) · 🔁 Comparte = 🎁 sorpresa',
   '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈',
-  '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀 🎬 🎨 👾 🌊) ¡y la eliges tú! Vota escribiendo 1, 2 o 3 🗳️'
+  '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀 🎬 🌊) ¡y la eliges tú! Vota escribiendo 1, 2 o 3 🗳️'
 ];
 setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
 setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 30*1000);

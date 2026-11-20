@@ -90,4 +90,4 @@ El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por p
 - **💔 Última vida:** antes del error de TOP, el chat tiene 10 s para mandar 50 likes y salvarla (máx. 2 veces por partida). Sube un poco el % de victorias.
 - **📸 Repetición:** al morir o ganar se repiten los últimos 5 s a x0.6 (se puede apagar en el panel).
 - **🌗 Día y noche:** el fondo pasa de amanecer a noche según se llena el tablero (se puede apagar en el panel).
-- **Nuevos modos:** 🎨 Acuarela, 👾 Retro (píxeles + sonido 8 bits) y 🌊 Bajo el agua (burbujas, ondas, más lenta).
+- **Nuevo modo:** 🌊 Bajo el agua (burbujas, ondas, más lenta).
