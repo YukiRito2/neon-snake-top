@@ -81,3 +81,13 @@ Velocidad inicial, aumento por manzana, velocidad máxima, tamaño de cuadrícul
 Cada partida empieza con una regla especial: 👻 Fantasma, 🪩 Disco (likes x2), 🧊 Hielo, 🔥 Infierno, 🌙 Noche, 🍀 Suerte o 🎬 Cine negro (todo en blanco y negro).
 El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por persona; empate o sin votos = azar).
 10 s después de empezar y luego cada ~100 s, el widget se convierte durante 20 s en un solo bloque gigante de votación y el bot lo anuncia en el chat.
+
+## 💬 Chat intuitivo, saludos y más (nov 2026)
+
+- **Sin "!snake":** si en TikFinity el evento del chat es *cualquier comentario* → acción *Snake Evento*, basta con escribir `turbo`, `lento`, `apagon`, `bloque`, `ruleta`, `lluvia`, `mascota` o un voto `1`/`2`/`3`. `!snake …` sigue funcionando. Los comentarios normales se ignoran; si alguien pregunta cómo participar, el bot le explica.
+- **👋 Saludo:** acción de Streamer.bot *Snake Saludo* (evento *Join* de TikFinity). El bot da la bienvenida agrupando nombres cada 40 s.
+- **🐣 Mascota:** `mascota` → mini serpiente con tu nombre que sigue a la grande 20 s.
+- **💔 Última vida:** antes del error de TOP, el chat tiene 10 s para mandar 50 likes y salvarla (máx. 2 veces por partida). Sube un poco el % de victorias.
+- **📸 Repetición:** al morir o ganar se repiten los últimos 5 s a x0.6 (se puede apagar en el panel).
+- **🌗 Día y noche:** el fondo pasa de amanecer a noche según se llena el tablero (se puede apagar en el panel).
+- **Nuevos modos:** 🎨 Acuarela, 👾 Retro (píxeles + sonido 8 bits) y 🌊 Bajo el agua (burbujas, ondas, más lenta).
