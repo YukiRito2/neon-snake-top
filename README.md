@@ -100,3 +100,16 @@ El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por p
 - **🎆 Despedida del directo:** tecla **Ç** (o botón en el panel): fuegos artificiales, resumen del directo (victorias, likes, rosas, follows), top 5 de los que más participaron y la corona; el bot se despide en el chat. Ç otra vez para quitarla.
 
 - **Panel por categorías:** el panel de stream se divide en secciones desplegables (Partida, Modificadores, Eventos de espectadores, Sonido, Directo y pantalla, Conexión y teclas). Recuerda cuáles dejaste abiertas.
+
+- **Eventos nuevos y mejorados (sin escudo):**
+  - ☄️ **Meteoritos** (chat `bloque`, tecla O): sombra 2 s, impacto y cráter mortal 3,5 s. Solo caen donde TOP puede esquivarlos.
+  - 🌑 **Apagón** (chat `apagon`, N): todo negro salvo la linterna delante de la cabeza; parpadea.
+  - ⏱️ **Tiempo bala** (chat `lento`, C): cámara lenta desaturada, ecos de la serpiente y ondas.
+  - ⚡ **Hiperespacio** (chat `turbo`, T): líneas de velocidad y estela de fuego.
+  - ✨ **Lluvia dorada** (chat `lluvia`, L, 300 likes): frutas que caen desde arriba y valen x2 durante 10 s.
+  - 🐍 **Rival** (chat `rival`, J): serpiente con el nombre del espectador que roba frutas 20 s; si choca con TOP, pierde ella.
+  - 🌀 **Portales** (chat `portal`, X): TOP los usa solo cuando son un atajo seguro.
+  - 💣 **Fruta bomba** (chat `bomba`, Z): 10 s para comérsela o explota y quita un trozo de cola.
+  - 🪞 **Espejo** (chat `espejo`, E): pantalla volteada 10 s.
+  - 🧲 **Imán** (chat `iman`, Y): las frutas cercanas van hacia la cabeza 8 s.
+  - Simulación: 40/40 partidas con eventos aleatorios cada 2,5–5,5 s sin muertes; 30/30 con portales permanentes (157 teletransportes).

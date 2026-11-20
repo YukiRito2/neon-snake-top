@@ -68,6 +68,11 @@
     box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:20px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
   #legend.hidden{display:none}
   #fx2{pointer-events:none;z-index:3}
+  #c,#fx2{transition:transform .7s cubic-bezier(.6,-0.4,.4,1.4)}
+  body.mirror #c,body.mirror #fx2{transform:scaleX(-1)}
+  #c{transition:transform .7s cubic-bezier(.6,-0.4,.4,1.4),filter .5s}
+  body.bullet:not(.noir) #c{filter:saturate(.3) contrast(1.15) brightness(1.05) hue-rotate(-10deg)}
+  body.hyper:not(.noir) #c{filter:saturate(1.5) contrast(1.1)}
   body.noir > *:not(#fx2):not(script){filter:grayscale(1) contrast(1.15) brightness(.88)}
   body.acuarela > *:not(#fx2):not(script){filter:saturate(.55) brightness(1.12) contrast(.92)}
   body.retro > *:not(#fx2):not(script){filter:grayscale(1) sepia(1) hue-rotate(55deg) saturate(4) brightness(.9) contrast(1.2)}
@@ -160,17 +165,21 @@
   </details>
   <details class="sec" data-sec="eventos"><summary>🎁 Eventos de espectadores</summary>
     <div class="btns">
-      <button id="rainBtn">🍎 Lluvia (L)</button>
+      <button id="rainBtn">✨ Lluvia dorada (L)</button>
       <button id="turboBtn">⚡ Turbo (T)</button>
       <button id="megaBtn">⭐ Mega orbe (G)</button>
-      <button id="obstBtn">🧱 Obstáculo (O)</button>
+      <button id="obstBtn">☄️ Meteoritos (O)</button>
       <button id="wheelBtn">🎰 Ruleta (U)</button>
       <button id="scisBtn">✂️ Tijeras (K)</button>
       <button id="poisonBtn">🌹 Maldición rosa (V)</button>
-      <button id="shieldBtn">🛡️ Escudo (E)</button>
-      <button id="slowBtn">🐢 Lenta (C)</button>
+      <button id="slowBtn">⏱️ Tiempo bala (C)</button>
       <button id="darkBtn">🌑 Apagón (N)</button>
       <button id="quakeBtn">🌋 Terremoto (Q)</button>
+      <button id="rivalBtn">🐍 Rival (J)</button>
+      <button id="portalBtn">🌀 Portales (X)</button>
+      <button id="bombBtn">💣 Fruta bomba (Z)</button>
+      <button id="mirrorBtn">🪞 Espejo (E)</button>
+      <button id="magnetBtn">🧲 Imán (Y)</button>
     </div>
   </details>
   <details class="sec" data-sec="sonido"><summary>🔊 Sonido</summary>
@@ -195,7 +204,7 @@
   <details class="sec" data-sec="conexion"><summary>🔌 Conexión y teclas</summary>
     <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
     <div class="keys" id="sbLast" style="word-break:break-all"></div>
-    <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · Ç: despedida del directo · M: sonido · R: reiniciar · F: pantalla completa</div>
+    <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: meteoritos · U: ruleta · K: tijeras · V: rosa · C: tiempo bala · N: apagón · Q: terremoto · J: rival · X: portales · Z: bomba · E: espejo · Y: imán<br>P / Esc: menú de pausa · Ç: despedida del directo · M: sonido · R: reiniciar · F: pantalla completa</div>
   </details>
 </div>
 
@@ -292,7 +301,7 @@ function reset(){
   for (let i=0;i<4;i++){ const c = hamCell[(k0 - i + N) % N]; snake.push({ x:c % cols, y:(c/cols)|0 }); }
   dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
   obstacles = []; forceDir = null; killedBy = ''; shields = 0; foods = []; grow = 0; score = 0; eaten = 0; combo = 0; hunger = 0; acc = 0; rainLeft = 0;
-  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null; boss = null; bossDone = false; shots = []; bossAt = 0.7 + Math.random()*0.2;
+  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null; clearEvents(); boss = null; bossDone = false; shots = []; bossAt = 0.7 + Math.random()*0.2;
   queue = queue.filter(d => !(d.x === -dir.x && d.y === -dir.y)).slice(0,1);
   spawnFood();
   state = (bot || queue.length) ? 'play' : 'ready';
@@ -315,6 +324,8 @@ function spawnFood(type){
   for (const s of snake) occ[s.y*cols+s.x] = 1;
   for (const f of foods) occ[f.y*cols+f.x] = 1;
   for (const o of obstacles) occ[o.c] = 1;
+  if (portals) for (const p of portals) occ[p] = 1;
+  if (rival) for (const p of rival.body) occ[p] = 1;
   if (N - snake.length - foods.length <= 0) return false;
   let c, tries = 0;
   do { c = (Math.random()*N)|0; } while (occ[c] && ++tries < 300);
@@ -323,9 +334,10 @@ function spawnFood(type){
     if (!list.length) return false;
     c = list[(Math.random()*list.length)|0];
   }
-  const mega = type === 'mega';
+  const mega = type === 'mega', isBomb = type === 'bomb', gold = !mega && !isBomb && now < goldUntil;
   const hues = [330, 0, 290, 25, 140, 200];
-  foods.push({ x:c%cols, y:(c/cols)|0, v:mega?5:1, mega, born:now, hue: mega ? 50 : hues[(Math.random()*hues.length)|0], name: foods.length < 3 ? fruitName() : '' });
+  foods.push({ x:c%cols, y:(c/cols)|0, v:mega?5:1, mega, born:now, hue: mega ? 50 : isBomb ? 0 : gold ? 46 : hues[(Math.random()*hues.length)|0],
+    name: foods.length < 3 && !isBomb ? fruitName() : '', bomb: isBomb, until: isBomb ? now + BOMB_MS : 0, gold, drop: gold && rainLeft > 0 });
   return true;
 }
 function curSps(){
@@ -363,11 +375,15 @@ function baseSps(){
 const minSafe = ttl => Math.ceil(0.55*rawSps()*(ttl - 1000)/1000) + 6;
 const ttlOf = o => o.ttl || OBST_MS;
 function step(){
+  botPortal = false;
   if (forceDir){ dir = forceDir; forceDir = null; }
   else if (bot){ const d = botMove(); if (d) dir = d; }
   else if (queue.length) dir = queue.shift();
-  const h = snake[0], nx = h.x + dir.x, ny = h.y + dir.y;
+  const h = snake[0]; let nx = h.x + dir.x, ny = h.y + dir.y;
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows){ killedBy = 'wall'; return die(nx, ny); }
+  
+  if (portals){ const pi = portals.indexOf(ny*cols + nx);
+    if (pi >= 0 && (!bot || botPortal)){ const o = portals[1 - pi]; portalFx(portals[pi], o); nx = o % cols; ny = (o/cols)|0; } }
   for (let i=0;i<obstacles.length;i++){
     const o = obstacles[i];
     if (o.c !== ny*cols + nx || !obstLive(o)) continue;
@@ -382,6 +398,10 @@ function step(){
   for (let i=0;i<lim;i++) if (snake[i].x === nx && snake[i].y === ny){ killedBy = 'body'; return die(nx, ny); }
   snake.unshift({x:nx, y:ny});
   if (popping) snake.pop(); else grow--;
+  if (rival && rival.body.includes(ny*cols + nx)) rivalEnd('top');
+  if (now < turboUntil && parts.length < 1800) for (let k=0;k<3;k++){ const ex = ox + (h.x+.5)*cell, ey = oy + (h.y+.5)*cell;
+    parts.push({ x:ex + (Math.random()-.5)*cell*.6, y:ey + (Math.random()-.5)*cell*.6, vx:-dir.x*1.5 + (Math.random()-.5), vy:-dir.y*1.5 + (Math.random()-.5) - 0.4,
+      life:1, decay:.03 + Math.random()*.03, hue:10 + Math.random()*40, size:3 + Math.random()*3, kind:2 }); }
   if (parts.length < 1800){ // estela de chispas detrás de la cabeza
     const ex = ox + (h.x+.5)*cell, ey = oy + (h.y+.5)*cell;
     parts.push({ x:ex + (Math.random()-.5)*cell*.5, y:ey + (Math.random()-.5)*cell*.5, vx:-dir.x*.6 + (Math.random()-.5)*.8, vy:-dir.y*.6 + (Math.random()-.5)*.8,
@@ -393,7 +413,7 @@ function step(){
 function eat(fi){
   const f = foods.splice(fi,1)[0];
   combo = (now - lastEat < 1500) ? combo + 1 : 0; lastEat = now;
-  score += f.v; eaten++; hunger = 0;
+  score += f.v + (f.gold ? f.v : 0); eaten++; hunger = 0;
   const px = ox + (f.x+.5)*cell, py = oy + (f.y+.5)*cell;
   burst(px, py, f.hue, f.mega ? 110 : (bot ? 26 : 40), f.mega ? 8 : 5);
   burst(px, py, (f.hue+180)%360, f.mega ? 30 : 8, 2, 2);
@@ -404,7 +424,9 @@ function eat(fi){
   pulse = Math.min(1, pulse + (f.mega ? 1 : 0.45)); scoreBump = 1;
   sEat(combo, f.mega);
   if (f.name) ateName(f.name, px, py);
-  if (f.mega) addFloat(px, py, '+5 MEGA', 50, 24);
+  if (f.bomb){ addFloat(px, py, '💣 ¡DESACTIVADA!', 120, 22); ring(px, py, 120, cell*6, 4); tone(880, .12, 'triangle', .1); tone(1320, .15, 'triangle', .08, null, .1); }
+  else if (f.mega) addFloat(px, py, '+5 MEGA', 50, 24);
+  else if (f.gold) addFloat(px, py, '+2 ✨', 48, 16);
   else if (combo >= 2 && !bot) addFloat(px, py, 'COMBO x'+(combo+1), (f.hue+40)%360, 15 + Math.min(combo,14));
   else addFloat(px, py, '+1', f.hue, 13);
   if (prog() >= goal()) return victory();
@@ -547,6 +569,7 @@ const cyc = (a, b) => (ham[b] - ham[a] + N) % N; // distancia hacia delante en e
    - En las partidas que "le toca" perder, a partir del ~75 % comete un error de cálculo creíble:
      va directo a por la fruta por un hueco que parece libre y se encierra solo. */
 function botMove(){
+  botPortal = false;
   const L = snake.length, body = new Array(L);
   for (let i=0;i<L;i++) body[i] = snake[i].y*cols + snake[i].x;
   const s = body[0], tail = body[L-1];
@@ -570,18 +593,21 @@ function botMove(){
   let oD = N; for (const o of obstacles){ if (o.front || o.hit || now - o.born >= ttlOf(o) - 1000) continue; oD = 0; }
   const cx = s % cols, cy = (s - cx)/cols;
   // entre los movimientos seguros, el que más acerca a la fruta en línea recta (parece natural)
-  let best = -1, bestD = 0, bestM = 1e9;
+  let best = -1, bestD = 0, bestM = 1e9, bestP = false;
   for (let k=0;k<4;k++){
     const nx = cx + DX[k], ny = cy + DY[k];
     if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
-    const n = ny*cols + nx;
+    let n = ny*cols + nx, viaP = false;
+    // 🌀 portal: solo si la salida es un atajo seguro del recorrido
+    if (portals && (n === portals[0] || n === portals[1])){ const o = n === portals[0] ? portals[1] : portals[0];
+      if (cur[o] <= 1){ const d2 = cyc(s, o); if (d2 > 1 && d2 <= avail && d2 < oD){ n = o; viaP = true; } } }
     if (cur[n] > 1) continue;
     const d = cyc(s, n);
     if (!(d === 1 || (d <= avail && d < oD))) continue;
-    const m = tf ? Math.abs(tf.x - nx) + Math.abs(tf.y - ny) : 0;
-    if (m < bestM || (m === bestM && d > bestD)){ best = k; bestD = d; bestM = m; }
+    const m = tf ? Math.abs(tf.x - n % cols) + Math.abs(tf.y - ((n/cols)|0)) : 0;
+    if (m < bestM || (m === bestM && d > bestD)){ best = k; bestD = d; bestM = m; bestP = viaP; }
   }
-  if (best >= 0) return DLIST[best];
+  if (best >= 0){ botPortal = bestP; return DLIST[best]; }
   return fallbackMove(body);   // por si se rompió el orden del ciclo (p. ej. tras jugar a mano)
 }
 // Respaldo: BFS a la fruta comprobando que la cola sigue alcanzable; si no, perseguir la cola.
@@ -677,8 +703,8 @@ function toggleBot(){
 }
 function togglePanel(){ S.panel = !S.panel; $('panel').classList.toggle('hidden', !S.panel); saveSettings(); }
 function toggleMute(){ S.muted = !S.muted; $('muteBtn').textContent = S.muted ? '🔇' : '🔊'; setVol(); saveSettings(); }
-function rain(){ rainLeft += 24; rainT = 0; addFloat(W/2, H*0.4, '🍎 ¡LLUVIA DE MANZANAS!', 0, 30); sEvent(); shake = Math.max(shake, 8); }
-function turbo(){ turboUntil = now + 10000; addFloat(W/2, H*0.4, '⚡ TURBO 10s', 55, 30); sEvent(); shake = Math.max(shake, 8); }
+function rain(){ rainLeft += 24; rainT = 0; goldUntil = now + 10000; addFloat(W/2, H*0.4, '✨ ¡LLUVIA DORADA! x2', 48, 30); sEvent(); shake = Math.max(shake, 8); }
+function turbo(){ turboUntil = now + 10000; slowUntil = 0; addFloat(W/2, H*0.4, '⚡ ¡HIPERESPACIO!', 55, 30); tone(200, .6, 'sawtooth', .1, 1200); sEvent(); shake = Math.max(shake, 8); }
 /* ---------- eventos para el público (TikFinity -> tecla) ---------- */
 // ✂️ Tijeras: la serpiente pierde la mitad del cuerpo (la partida se alarga; TOP sigue pudiendo ganar)
 function scissors(){
@@ -992,11 +1018,11 @@ setInterval(() => {
   greetLast = Date.now();
   const names = greetQ.slice(0, 3).join(', ') + (greetQ.length > 3 ? ' y ' + (greetQ.length - 3) + ' más' : '');
   greetQ = [];
-  try { chatSay(`👋 ¡Bienvenid@s ${names}! La serpiente juega sola y TÚ la controlas: escribe turbo, lento, apagon o ruleta 🐍 ❤️ 100 likes = 🎰`, 1); } catch(e){}
+  try { chatSay(`👋 ¡Bienvenid@s ${names}! La serpiente juega sola y TÚ la controlas: escribe turbo, lento, apagon, bloque, rival, bomba o ruleta 🐍 ❤️ 100 likes = 🎰`, 1); } catch(e){}
 }, 5000);
 function chatHelp(who){
   if (now - helpLast < 45000) return; helpLast = now;
-  try { chatSay(`🐍 ${who !== 'Alguien' ? who + ' ' : ''}¡Fácil! Escribe: turbo ⚡ lento 🐢 apagon 🌑 bloque 🧱 ruleta 🎰 mascota 🐣 · vota 1, 2 o 3 · ❤️ cada 100 likes = ruleta`, 2); } catch(e){}
+  try { chatSay(`🐍 ${who !== 'Alguien' ? who + ' ' : ''}¡Fácil! Escribe: turbo ⚡ lento ⏱️ apagon 🌑 bloque ☄️ rival 🐍 portal 🌀 bomba 💣 espejo 🪞 iman 🧲 ruleta 🎰 mascota 🐣 · vota 1, 2 o 3 · ❤️ cada 100 likes = ruleta`, 2); } catch(e){}
 }
 
 /* ---------- 🐣 mascota del espectador: una mini serpiente con su nombre sigue a la grande 20 s ---------- */
@@ -1388,14 +1414,16 @@ function drawRose(){
   ctx.restore();
 }
 // 🎰 Ruleta: elige un evento al azar (para likes / interacciones). Se encolan si llegan varias.
-const WHEEL = [ ['🍎 LLUVIA',25,() => rain()], ['⭐ MEGA ORBE',15,() => mega()], ['⚡ TURBO',15,() => turbo()], ['🐢 CÁMARA LENTA',10,() => slowmo()],
-  ['🌑 APAGÓN',10,() => blackout()], ['🧱 OBSTÁCULO',10,() => obstacle()], ['🌋 TERREMOTO',8,() => quake()], ['✂️ TIJERAS',4,() => scissors()], ['☠️ VENENO',3,() => poison()] ];
+const WHEEL = [ ['✨ LLUVIA DORADA',20,() => rain()], ['⭐ MEGA ORBE',12,() => mega()], ['⚡ HIPERESPACIO',12,() => turbo()], ['⏱️ TIEMPO BALA',8,() => slowmo()],
+  ['🌑 APAGÓN',8,() => blackout()], ['☄️ METEORITOS',9,() => meteorRain()], ['🌋 TERREMOTO',6,() => quake()], ['🐍 RIVAL',7,() => spawnRival('🎰 Ruleta')],
+  ['🌀 PORTALES',7,() => spawnPortals()], ['💣 BOMBA',7,() => bomb()], ['🪞 ESPEJO',5,() => mirror()], ['🧲 IMÁN',7,() => magnet()],
+  ['✂️ TIJERAS',3,() => scissors()], ['☠️ VENENO',2,() => poison()] ];
 let wheelQueue = 0, wheelSpin = null;
 function roulette(){ wheelQueue = Math.min(wheelQueue + 1, 5); if (!wheelSpin) nextSpin(); }
 function nextSpin(){
   if (wheelQueue <= 0){ wheelSpin = null; return; }
   wheelQueue--;
-  const wl = modIs('suerte') ? WHEEL.filter(w => /LLUVIA|MEGA|LENTA/.test(w[0])) : WHEEL;
+  const wl = modIs('suerte') ? WHEEL.filter(w => /LLUVIA|MEGA|BALA|IMÁN|PORTALES/.test(w[0])) : WHEEL;
   let r = Math.random()*wl.reduce((a,w) => a + w[1], 0), pick = wl[0];
   for (const w of wl){ r -= w[1]; if (r <= 0){ pick = w; break; } }
   wheelSpin = { pick, start: now, idx: 0, lastTick: 0 };
@@ -1422,11 +1450,333 @@ function drawWheel(){
   ctx.fillText(txt, W/2, oy + rows*cell*0.15 + fs*0.25); ctx.globalAlpha = 1;
 }
 // 🐢 Cámara lenta 10 s
-function slowmo(){ slowUntil = now + 10000; turboUntil = 0; addFloat(W/2, H*0.4, '🐢 CÁMARA LENTA', 160, Math.min(36, W/12)); tone(400, .6, 'sine', .15, 100); }
+function slowmo(){ slowUntil = now + 10000; turboUntil = 0; addFloat(W/2, H*0.4, '⏱️ TIEMPO BALA', 190, Math.min(36, W/12)); tone(400, 1.2, 'sine', .15, 60); tone(100, 1, 'triangle', .12, 50); }
 // 🌑 Apagón 10 s: solo se ve alrededor de la cabeza
 function blackout(){ darkUntil = now + 10000; addFloat(W/2, H*0.4, '🌑 ¡APAGÓN!', 260, Math.min(36, W/12)); tone(200, .5, 'sawtooth', .12, 50); }
 // 🌋 Terremoto 2.5 s
 function quake(){ quakeUntil = now + 2500; for (let i=0;i<3;i++) setTimeout(() => obstacle(true), 400 + i*500); addFloat(W/2, H*0.4, '🌋 ¡TERREMOTO!', 20, Math.min(36, W/12)); tone(50, 1.2, 'sawtooth', .25, 30); }
+
+/* ---------- eventos nuevos: ☄️ meteoritos · 🐍 rival · 🌀 portales · 💣 bomba · 🪞 espejo · 🧲 imán ---------- */
+let meteors = [], rival = null, portals = null, portalUntil = 0, botPortal = false, mirrorUntil = 0, magnetUntil = 0, magT = 0, goldUntil = 0;
+let echoes = [], echoT = 0, rippleT = 0, flickerUntil = 0, hyper = [];
+const METEOR_WARN = 2000, METEOR_TTL = 3500, RIVAL_MS = 20000, PORTAL_MS = 15000, BOMB_MS = 10000;
+const cellXY = c => [ox + (c % cols + .5)*cell, oy + (((c/cols)|0) + .5)*cell];
+function freeOcc(){
+  const occ = new Uint8Array(N);
+  for (const p of snake) occ[p.y*cols + p.x] = 1;
+  for (const f of foods) occ[f.y*cols + f.x] = 1;
+  for (const o of obstacles) occ[o.c] = 1;
+  if (portals) for (const p of portals) occ[p] = 1;
+  if (rival) for (const p of rival.body) occ[p] = 1;
+  return occ;
+}
+function clearEvents(){ meteors = []; rival = null; portals = null; botPortal = false; echoes = []; }
+// ☄️ Meteoritos: primero una sombra que crece 2 s (aviso), luego impacto y un cráter que mata 3,5 s.
+// Solo caen donde TOP puede esquivarlos (lejos en su recorrido); si no hay sitio, ese meteorito no cae.
+function meteorRain(n){
+  if (state !== 'play' || snake.length < 2) return;
+  n = n || 4;
+  addFloat(W/2, H*0.4, '☄️ ¡LLUVIA DE METEORITOS!', 25, Math.min(38, W/12));
+  tone(900, 1.4, 'sawtooth', .07, 120);
+  for (let i=0;i<n;i++) setTimeout(meteorDrop, i*650);
+}
+function meteorDrop(){
+  if (state !== 'play' || !snake.length) return;
+  const occ = freeOcc(), h = snake[0], s0 = h.y*cols + h.x, safe = ham && bot;
+  const md = safe ? minSafe(METEOR_TTL + METEOR_WARN) + 4 : 6;
+  const ok = i => !occ[i] && Math.abs(i % cols - h.x) + Math.abs(((i/cols)|0) - h.y) > 3 && (!safe || cyc(s0, i) >= md);
+  const free = []; for (let i=0;i<N;i++) if (ok(i)) free.push(i);
+  if (!free.length) return;
+  const c = free[(Math.random()*free.length)|0], cx = c % cols, cy = (c/cols)|0, cells = [c];
+  for (let k=0;k<4;k++){ const x = cx + DX[k], y = cy + DY[k]; if (x < 0 || y < 0 || x >= cols || y >= rows) continue;
+    const j = y*cols + x; if (Math.random() < 0.5 && ok(j)) cells.push(j); }
+  for (const j of cells) obstacles.push({ c: j, born: now + METEOR_WARN, front: false, ttl: METEOR_TTL, meteor: true });
+  meteors.push({ c, cells, start: now, sx: Math.random() < 0.5 ? -1 : 1, hit: false });
+  tone(1400, 1.9, 'sine', .05, 300);
+}
+function meteorTick(){
+  for (let i=meteors.length-1;i>=0;i--){
+    const m = meteors[i];
+    if (!m.hit && now - m.start >= METEOR_WARN){
+      m.hit = true; const [x, y] = cellXY(m.c);
+      shake = Math.max(shake, 18); flash = Math.max(flash, 0.35);
+      burst(x, y, 25, 70, 8); burst(x, y, 45, 40, 5, 2); ring(x, y, 30, cell*7, 6); ring(x, y, 50, cell*4, 4);
+      for (const j of m.cells){ const [a, b] = cellXY(j); burst(a, b, 15, 10, 4); }
+      tone(70, .7, 'sawtooth', .3, 30); tone(140, .3, 'square', .12, 40);
+    }
+    if (now - m.start > METEOR_WARN + METEOR_TTL + 200) meteors.splice(i, 1);
+  }
+}
+function drawMeteors(){
+  for (const m of meteors){
+    const el = now - m.start; if (el >= METEOR_WARN) continue;
+    const k = el/METEOR_WARN, [x, y] = cellXY(m.c);
+    // sombra que crece en el suelo
+    ctx.fillStyle = `rgba(0,0,0,${0.25 + 0.5*k})`;
+    for (const j of m.cells){ const [a, b] = cellXY(j); ctx.beginPath(); ctx.ellipse(a, b, cell*0.55*k + 2, cell*0.3*k + 1, 0, 0, 6.28); ctx.fill(); }
+    ctx.strokeStyle = `rgba(255,${120 - 80*k},0,${0.4 + 0.5*Math.abs(Math.sin(el*0.02))})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, cell*(1.6 - k), 0, 6.28); ctx.stroke();
+    // el meteorito cae en diagonal con estela de fuego
+    const e = k, mx = x + m.sx*(1 - e)*W*0.3, my = y - (1 - e)*Math.max(H*0.55, y - oy + cell*3), r = cell*(0.35 + 0.35*k);
+    const tx = mx + m.sx*cell*5, ty = my - cell*9;
+    const g = ctx.createLinearGradient(mx, my, tx, ty); g.addColorStop(0, 'rgba(255,200,60,0.95)'); g.addColorStop(0.3, 'rgba(255,80,0,0.6)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+    ctx.strokeStyle = g; ctx.lineCap = 'round'; ctx.lineWidth = r*1.8; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke(); ctx.lineCap = 'butt';
+    ctx.fillStyle = '#ffd27a'; ctx.shadowColor = '#ff6a00'; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(mx, my, r, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+    if (Math.random() < 0.5) parts.push({ x: mx, y: my, vx: (Math.random() - .5)*2, vy: -Math.random()*2, life: .8, decay: .04, hue: 20 + Math.random()*30, size: 3 + Math.random()*3, kind: 2 });
+  }
+}
+// cráter (en vez del bloque rayado)
+function drawCrater(x, y, age, ttl){
+  const glow = 0.6 + 0.4*Math.sin(age*0.012), m = cell*0.06;
+  ctx.fillStyle = '#1a0a05'; rrect(ctx, x + m, y + m, cell - 2*m, cell - 2*m, cell*0.3);
+  const g = ctx.createRadialGradient(x + cell/2, y + cell/2, 1, x + cell/2, y + cell/2, cell*0.55);
+  g.addColorStop(0, `rgba(255,${150 + 80*glow},40,${0.95*glow})`); g.addColorStop(0.5, 'rgba(255,60,0,0.55)'); g.addColorStop(1, 'rgba(80,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(x, y, cell, cell);
+  ctx.strokeStyle = `rgba(255,190,60,${0.8*glow})`; ctx.lineWidth = Math.max(1, cell*0.06);
+  ctx.beginPath(); for (let k=0;k<5;k++){ const a = k*1.26 + (x + y)*0.1; ctx.moveTo(x + cell/2, y + cell/2); ctx.lineTo(x + cell/2 + Math.cos(a)*cell*0.45, y + cell/2 + Math.sin(a)*cell*0.45); } ctx.stroke();
+  if (Math.random() < 0.06) parts.push({ x: x + cell/2, y: y + cell/2, vx: (Math.random() - .5)*.8, vy: -0.6 - Math.random(), life: .7, decay: .03, hue: 20, size: 2, kind: 2 });
+}
+
+// 🐍 Serpiente rival: 20 s robando frutas con el nombre del espectador. Si choca contra TOP o TOP la
+// atropella, la rival pierde (TOP no puede morir por ella).
+function spawnRival(who){
+  if (state !== 'play' || !snake.length) return;
+  if (rival){ rival.until = Math.max(rival.until, now + 8000); return; }
+  const occ = freeOcc(), h = snake[0]; let best = -1, bd = -1;
+  for (let k=0;k<80;k++){ const i = (Math.random()*N)|0; if (occ[i]) continue; const d = Math.abs(i % cols - h.x) + Math.abs(((i/cols)|0) - h.y); if (d > bd){ bd = d; best = i; } }
+  if (best < 0) return;
+  rival = { body: [best], grow: 4, name: who && who !== 'Alguien' ? who : 'RIVAL', until: now + RIVAL_MS, acc: 0, ate: 0, born: now, dir: 0 };
+  const [x, y] = cellXY(best); burst(x, y, 0, 50, 6); ring(x, y, 0, cell*5, 4);
+  addFloat(W/2, H*0.4, '🐍 ¡SERPIENTE RIVAL! ' + rival.name, 0, Math.min(34, W/13));
+  tone(220, .25, 'sawtooth', .12, 330); tone(330, .25, 'sawtooth', .1, 440, .2);
+  try { chatSay(`🐍 ${rival.name} soltó una SERPIENTE RIVAL que roba frutas 20 s 😈 (escribe rival)`, 1); feedPush('🐍 Rival de ' + rival.name); } catch(e){}
+}
+function rivalEnd(why){
+  if (!rival) return;
+  for (const c of rival.body){ const [x, y] = cellXY(c); burst(x, y, 0, 8, 5); }
+  const [hx, hy] = cellXY(rival.body[0]);
+  if (why === 'tiempo'){ addFloat(hx, hy - cell, '🐍 ' + rival.name + ' robó ' + rival.ate + ' 🍎', 0, Math.min(26, W/16)); try { chatSay(`🐍 La rival de ${rival.name} se fue con ${rival.ate} frutas robadas 😈`, 0); } catch(e){} }
+  else { ring(hx, hy, 0, cell*6, 5); shake = Math.max(shake, 10); tone(110, .4, 'sawtooth', .18, 40);
+    addFloat(hx, hy - cell, why === 'top' ? '💥 ¡TOP SE COMIÓ A LA RIVAL!' : '💥 ¡LA RIVAL SE ESTRELLÓ!', 50, Math.min(26, W/16)); }
+  rival = null;
+}
+function rivalStep(){
+  const r = rival, hd = r.body[0], hx = hd % cols, hy = (hd/cols)|0;
+  const blk = new Uint8Array(N);
+  for (const p of snake) blk[p.y*cols + p.x] = 1;
+  for (const o of obstacles) if (obstLive(o)) blk[o.c] = 1;
+  for (let i=0;i<r.body.length - (r.grow ? 0 : 1);i++) blk[r.body[i]] = 1;
+  if (portals) for (const p of portals) blk[p] = 1;
+  // BFS hasta la fruta más cercana
+  const pv = new Int32Array(N).fill(-1), qq = [hd]; pv[hd] = hd; let goal = -1;
+  const fm = new Uint8Array(N); for (const f of foods) fm[f.y*cols + f.x] = 1;
+  for (let qi=0; qi<qq.length && goal < 0; qi++){
+    const c = qq[qi], x = c % cols, y = (c/cols)|0;
+    for (let k=0;k<4;k++){ const nx = x + DX[k], ny = y + DY[k]; if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const n = ny*cols + nx; if (pv[n] >= 0 || blk[n]) continue; pv[n] = c; if (fm[n]){ goal = n; break; } qq.push(n); }
+  }
+  let nxt = -1;
+  if (goal >= 0){ nxt = goal; while (pv[nxt] !== hd) nxt = pv[nxt]; }
+  else { const opts = []; for (let k=0;k<4;k++){ const nx = hx + DX[k], ny = hy + DY[k]; if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue; const n = ny*cols + nx; if (!blk[n]) opts.push(n); }
+    if (opts.length) nxt = opts[(Math.random()*opts.length)|0]; }
+  if (nxt < 0){ // sin salida: se estrella contra lo que tenga delante
+    rivalEnd('choque'); return; }
+  if (snake.some(p => p.y*cols + p.x === nxt)){ rivalEnd('choque'); return; }
+  r.dir = nxt - hd; r.body.unshift(nxt);
+  if (r.grow > 0) r.grow--; else r.body.pop();
+  const fi = foods.findIndex(f => f.y*cols + f.x === nxt);
+  if (fi >= 0){
+    const f = foods.splice(fi, 1)[0]; r.ate++; r.grow += 1; const [x, y] = cellXY(nxt);
+    burst(x, y, 0, 18, 4); addFloat(x, y, '😈 ROBADA', 0, 14); tone(300, .08, 'square', .06, 180);
+    if (foods.length < 1) spawnFood();
+  }
+}
+function rivalTick(dt){
+  if (!rival) return;
+  if (state !== 'play' || now > rival.until){ rivalEnd('tiempo'); return; }
+  rival.acc += dt; const iv = 1000/Math.max(5, Math.min(14, curSps()*0.6));
+  while (rival && rival.acc >= iv){ rival.acc -= iv; rivalStep(); }
+}
+function drawRival(){
+  if (!rival) return;
+  const b = rival.body, al = Math.min(1, (now - rival.born)/300, (rival.until - now)/500);
+  ctx.globalAlpha = Math.max(0, al);
+  for (let i=b.length-1;i>=0;i--){ const x = ox + (b[i] % cols)*cell, y = oy + ((b[i]/cols)|0)*cell, p = cell*0.14;
+    ctx.fillStyle = i ? `hsl(${(355 + i*4)%360},100%,${45 - i*1.5}%)` : '#ff3355'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = i ? 8 : 18;
+    rrect(ctx, x + p, y + p, cell - 2*p, cell - 2*p, cell*0.25); }
+  ctx.shadowBlur = 0;
+  const [hx, hy] = cellXY(b[0]);
+  // ojos enfadados
+  ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(1.5, cell*0.07);
+  ctx.beginPath(); ctx.moveTo(hx - cell*0.25, hy - cell*0.2); ctx.lineTo(hx - cell*0.05, hy - cell*0.08); ctx.moveTo(hx + cell*0.25, hy - cell*0.2); ctx.lineTo(hx + cell*0.05, hy - cell*0.08); ctx.stroke();
+  ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(hx - cell*0.13, hy + cell*0.04, Math.max(1.5, cell*0.07), 0, 6.28); ctx.arc(hx + cell*0.13, hy + cell*0.04, Math.max(1.5, cell*0.07), 0, 6.28); ctx.fill();
+  const fs = Math.max(11, Math.min(15, cell*0.5)), left = Math.ceil((rival.until - now)/1000);
+  ctx.font = `800 ${fs}px "Segoe UI",system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  const lbl = '😈 ' + rival.name + ' · ' + rival.ate + '🍎 · ' + left + 's', ty = hy - cell*0.6 < oy + fs ? hy + cell*0.6 + fs : hy - cell*0.6;
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.9)'; ctx.strokeText(lbl, hx, ty); ctx.fillStyle = '#ff8095'; ctx.fillText(lbl, hx, ty);
+  ctx.globalAlpha = 1;
+}
+
+// 🌀 Portales: 15 s. TOP los usa como atajo solo cuando es seguro (cuenta como un atajo del recorrido).
+function spawnPortals(){
+  if (state !== 'play' || !snake.length) return;
+  const occ = freeOcc(), h = snake[0], free = [];
+  for (let i=0;i<N;i++){ if (occ[i]) continue; const x = i % cols, y = (i/cols)|0;
+    if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1) continue;
+    if (Math.abs(x - h.x) + Math.abs(y - h.y) > 2) free.push(i); }
+  if (free.length < 2) return;
+  let a = free[(Math.random()*free.length)|0], b = -1, bd = -1;
+  for (let k=0;k<60;k++){ const c = free[(Math.random()*free.length)|0], d = Math.abs(c % cols - a % cols) + Math.abs(((c/cols)|0) - ((a/cols)|0)); if (c !== a && d > bd){ bd = d; b = c; } }
+  if (b < 0) return;
+  portals = [a, b]; portalUntil = now + PORTAL_MS;
+  for (const c of portals){ const [x, y] = cellXY(c); ring(x, y, 280, cell*5, 5); burst(x, y, 270, 40, 5); }
+  addFloat(W/2, H*0.4, '🌀 ¡PORTALES!', 280, Math.min(38, W/12));
+  [392, 523, 659, 880].forEach((f, i) => tone(f, .25, 'sine', .07, f*1.5, i*.07));
+}
+function portalTick(){
+  if (portals && (now > portalUntil || state !== 'play')){ for (const c of portals){ const [x, y] = cellXY(c); burst(x, y, 280, 25, 4); } portals = null; }
+}
+function portalFx(a, b){
+  const [x1, y1] = cellXY(a), [x2, y2] = cellXY(b);
+  ring(x1, y1, 280, cell*3, 4); ring(x2, y2, 190, cell*4, 4); burst(x2, y2, 200, 25, 5); burst(x1, y1, 290, 15, 3);
+  tone(660, .15, 'sine', .08, 1320); pulse = Math.max(pulse, 0.6);
+}
+function drawPortals(){
+  if (!portals) return;
+  const left = portalUntil - now, al = Math.min(1, (PORTAL_MS - left)/300, left/500);
+  ctx.globalAlpha = Math.max(0, al);
+  portals.forEach((c, i) => {
+    const [x, y] = cellXY(c), hue = i ? 190 : 285, R = cell*0.62;
+    const g = ctx.createRadialGradient(x, y, 1, x, y, R*1.6); g.addColorStop(0, `hsla(${hue},100%,85%,0.95)`); g.addColorStop(0.45, `hsla(${hue},100%,55%,0.7)`); g.addColorStop(1, `hsla(${hue},100%,40%,0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R*1.6, 0, 6.28); ctx.fill();
+    ctx.strokeStyle = `hsl(${hue},100%,70%)`; ctx.lineWidth = 2;
+    for (let k=0;k<3;k++){ const a0 = now*0.006*(i ? -1 : 1) + k*2.09; ctx.beginPath(); ctx.arc(x, y, R*(0.5 + k*0.25), a0, a0 + 2.2); ctx.stroke(); }
+    if (Math.random() < 0.3){ const a = Math.random()*6.28; parts.push({ x: x + Math.cos(a)*R*1.5, y: y + Math.sin(a)*R*1.5, vx: -Math.cos(a)*1.2, vy: -Math.sin(a)*1.2, life: .6, decay: .05, hue, size: 2, kind: 2 }); }
+  });
+  ctx.globalAlpha = 1;
+}
+
+// 💣 Fruta bomba: si TOP no se la come en 10 s, explota y le quita un trozo de cola.
+function bomb(){
+  if (state !== 'play') return;
+  if (foods.filter(f => f.bomb).length >= 2) return;
+  if (spawnFood('bomb')){ const f = foods[foods.length - 1], [x, y] = cellXY(f.y*cols + f.x);
+    ring(x, y, 0, cell*4, 4); addFloat(W/2, H*0.4, '💣 ¡FRUTA BOMBA! 10s', 10, Math.min(36, W/12)); tone(180, .2, 'square', .1, null); }
+}
+function bombTick(){
+  for (let i=foods.length-1;i>=0;i--){
+    const f = foods[i]; if (!f.bomb || now < f.until) continue;
+    foods.splice(i, 1);
+    const [x, y] = cellXY(f.y*cols + f.x);
+    shake = Math.max(shake, 22); flash = Math.max(flash, 0.6);
+    burst(x, y, 20, 90, 9); burst(x, y, 50, 40, 6, 2); ring(x, y, 20, cell*10, 7); ring(x, y, 50, cell*6, 5);
+    tone(55, .9, 'sawtooth', .35, 25); tone(120, .4, 'square', .15, 30);
+    if (state === 'play' && snake.length > 6){
+      const keep = Math.max(4, snake.length - Math.max(3, Math.ceil(snake.length*0.12))), cut = snake.splice(keep);
+      for (const c of cut) burst(ox + (c.x+.5)*cell, oy + (c.y+.5)*cell, 20 + Math.random()*30, 4, 4);
+      grow = 0; tension = false; milestone = [0,25,50,75,90].filter(m => m <= Math.floor(100*snake.length/N)).pop();
+      if (fate === 'lose' && deathScore <= prog()) deathScore = Math.min(goal() - 1, prog() + Math.ceil(goal()*0.05));
+      addFloat(x, y - cell, '💣 ¡BUM! -' + cut.length, 15, Math.min(34, W/13));
+      try { chatSay(`💣 ¡BUM! La bomba explotó y la serpiente perdió ${cut.length} trozos 😵`, 0); } catch(e){}
+      updateHud();
+    } else addFloat(x, y - cell, '💣 ¡BUM!', 15, Math.min(34, W/13));
+    if (!foods.length) spawnFood();
+  }
+}
+
+// 🪞 Espejo 10 s (la pantalla se da la vuelta) · 🧲 Imán 8 s (las frutas cercanas van hacia la cabeza)
+function mirror(){ if (state !== 'play') return; mirrorUntil = now + 10000; tone(500, .4, 'triangle', .1, 1000); setTimeout(() => addFloat(W/2, H*0.4, '🪞 ¡ESPEJO!', 200, Math.min(40, W/11)), 350); }
+function magnet(){ if (state !== 'play') return; magnetUntil = now + 8000; magT = 0; addFloat(W/2, H*0.4, '🧲 ¡IMÁN!', 220, Math.min(38, W/12)); tone(150, .8, 'sine', .15, 300); }
+function magnetTick(dt){
+  if (now >= magnetUntil || state !== 'play' || !snake.length) return;
+  magT -= dt; if (magT > 0) return; magT = 260;
+  const occ = freeOcc(), h = snake[0];
+  for (const f of foods){
+    const dx = h.x - f.x, dy = h.y - f.y, d = Math.abs(dx) + Math.abs(dy);
+    if (d > 9 || d < 2) continue;
+    const opts = []; if (dx) opts.push([Math.sign(dx), 0]); if (dy) opts.push([0, Math.sign(dy)]);
+    if (Math.abs(dy) > Math.abs(dx)) opts.reverse();
+    for (const [mx, my] of opts){ const nx = f.x + mx, ny = f.y + my, n = ny*cols + nx; if (occ[n]) continue;
+      occ[f.y*cols + f.x] = 0; occ[n] = 1; f.px = f.x; f.py = f.y; f.mt = now; f.x = nx; f.y = ny; break; }
+  }
+}
+function drawMagnet(){
+  if (now >= magnetUntil || !snake.length) return;
+  const h = snake[0], hx = ox + (h.x+.5)*cell, hy = oy + (h.y+.5)*cell, left = magnetUntil - now, al = Math.min(1, left/400);
+  ctx.globalAlpha = al; ctx.setLineDash([4, 6]); ctx.lineDashOffset = -now*0.05; ctx.lineWidth = 2;
+  for (const f of foods){ const d = Math.abs(h.x - f.x) + Math.abs(h.y - f.y); if (d > 9) continue;
+    const fx = ox + (f.x+.5)*cell, fy = oy + (f.y+.5)*cell, mx = (fx + hx)/2 + (fy - hy)*0.2, my = (fy + hy)/2 - (fx - hx)*0.2;
+    ctx.strokeStyle = `hsla(${200 + Math.sin(now*0.01)*20},100%,70%,0.8)`; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.quadraticCurveTo(mx, my, hx, hy); ctx.stroke(); }
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(120,200,255,0.5)'; ctx.beginPath(); ctx.arc(hx, hy, cell*(1.2 + (now*0.004 % 1)*8), 0, 6.28); ctx.stroke();
+  ctx.font = `${Math.max(14, cell*0.8)}px "Segoe UI Emoji",sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧲', hx, hy - cell*1.1);
+  ctx.globalAlpha = 1;
+}
+
+// ⚡ Hiperespacio (turbo) y ⏱️ tiempo bala (lento): efectos encima del tablero
+function drawSpeedFx(dt){
+  const t = now;
+  if (t < turboUntil && snake.length){
+    const left = turboUntil - t, al = Math.min(1, left/500, (10000 - left)/300);
+    while (hyper.length < 70) hyper.push({ a: Math.random()*6.28, r: Math.random()*Math.max(W, H)*0.5, v: 0.5 + Math.random() });
+    const cx = W/2, cy = H/2; ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    for (const s of hyper){ s.r += s.v*dt*(0.8 + s.r/300); if (s.r > Math.max(W, H)*0.75){ s.r = 20 + Math.random()*60; s.a = Math.random()*6.28; }
+      const len = 20 + s.r*0.25, ca = Math.cos(s.a), sa = Math.sin(s.a);
+      ctx.strokeStyle = `hsla(${(hueNow + 180)%360},100%,82%,${0.6*al*Math.min(1, s.r/150)})`; ctx.lineWidth = 1.5 + s.r/300;
+      ctx.beginPath(); ctx.moveTo(cx + ca*s.r, cy + sa*s.r); ctx.lineTo(cx + ca*(s.r + len), cy + sa*(s.r + len)); ctx.stroke(); }
+    ctx.lineCap = 'butt'; ctx.globalCompositeOperation = 'source-over';
+    // borde rojo de velocidad
+    const g = ctx.createRadialGradient(cx, cy, Math.min(W, H)*0.35, cx, cy, Math.max(W, H)*0.75);
+    g.addColorStop(0, 'rgba(255,80,0,0)'); g.addColorStop(1, `rgba(255,60,0,${0.25*al})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    shake = Math.max(shake, 1.5);
+  } else hyper.length = 0;
+  if (t < slowUntil && snake.length){
+    const left = slowUntil - t, al = Math.min(1, left/500, (10000 - left)/300);
+    // ecos de la serpiente
+    echoT -= dt; if (echoT <= 0){ echoT = 110; echoes.unshift(snake.slice(0, 40).map(p => ({ x: p.x, y: p.y }))); if (echoes.length > 6) echoes.pop(); }
+    ctx.lineWidth = 1.5;
+    echoes.forEach((e, i) => { ctx.strokeStyle = `hsla(${190 + i*15},100%,70%,${0.35*al*(1 - i/6)})`;
+      for (const p of e) ctx.strokeRect(ox + p.x*cell + cell*0.2 - i, oy + p.y*cell + cell*0.2 - i, cell*0.6 + 2*i, cell*0.6 + 2*i); });
+    rippleT -= dt; if (rippleT <= 0){ rippleT = 650; const h = snake[0]; ring(ox + (h.x+.5)*cell, oy + (h.y+.5)*cell, 190, cell*9, 2); }
+    const g = ctx.createRadialGradient(W/2, H/2, Math.min(W, H)*0.3, W/2, H/2, Math.max(W, H)*0.75);
+    g.addColorStop(0, 'rgba(0,40,60,0)'); g.addColorStop(1, `rgba(0,120,160,${0.3*al})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // franjas de "película a cámara lenta"
+    ctx.fillStyle = `rgba(0,0,0,${0.85*al})`; const bh = H*0.09*al; ctx.fillRect(-20, -20, W + 40, bh + 20); ctx.fillRect(-20, H - bh, W + 40, bh + 20);
+  } else echoes.length = 0;
+}
+// 🌑 Apagón: todo negro salvo una linterna delante de la cabeza (y parpadea de vez en cuando)
+const darkC = document.createElement('canvas'), darkX = darkC.getContext('2d');
+function drawBlackout(){
+  if (now >= darkUntil || !snake.length) return;
+  const left = darkUntil - now, k = Math.min(1, (10000 - left)/400, left/600);
+  if (darkC.width !== W || darkC.height !== H){ darkC.width = W; darkC.height = H; }
+  const h = snake[0], hx = ox + (h.x+.5)*cell, hy = oy + (h.y+.5)*cell;
+  if (Math.random() < 0.012) flickerUntil = now + 60 + Math.random()*120;
+  const off = now < flickerUntil;
+  darkX.globalCompositeOperation = 'source-over'; darkX.clearRect(0, 0, W, H);
+  darkX.fillStyle = `rgba(0,0,0,${0.97*k})`; darkX.fillRect(0, 0, W, H);
+  if (!off){
+    darkX.globalCompositeOperation = 'destination-out';
+    let g = darkX.createRadialGradient(hx, hy, 0, hx, hy, cell*1.8); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    darkX.fillStyle = g; darkX.fillRect(hx - cell*2, hy - cell*2, cell*4, cell*4);
+    const ang = Math.atan2(dir.y, dir.x), L = cell*7.5, sp = 0.48;
+    g = darkX.createRadialGradient(hx, hy, cell*0.5, hx, hy, L); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.7, 'rgba(0,0,0,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    darkX.fillStyle = g; darkX.beginPath(); darkX.moveTo(hx, hy); darkX.arc(hx, hy, L, ang - sp, ang + sp); darkX.closePath(); darkX.fill();
+  }
+  ctx.drawImage(darkC, 0, 0, W, H);
+  // haz de luz cálido
+  if (!off){ ctx.globalCompositeOperation = 'lighter'; const ang = Math.atan2(dir.y, dir.x);
+    const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, cell*7.5); g.addColorStop(0, `rgba(255,240,180,${0.18*k})`); g.addColorStop(1, 'rgba(255,240,180,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.arc(hx, hy, cell*7.5, ang - 0.48, ang + 0.48); ctx.closePath(); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+  // las frutas brillan un poco en la oscuridad
+  for (const f of foods){ const fx = ox + (f.x+.5)*cell, fy = oy + (f.y+.5)*cell; ctx.fillStyle = `hsla(${f.hue},100%,60%,${0.25*k})`; ctx.beginPath(); ctx.arc(fx, fy, cell*0.15, 0, 6.28); ctx.fill(); }
+}
+function eventsTick(dt){
+  meteorTick(); rivalTick(dt); portalTick(); bombTick(); magnetTick(dt);
+  const bt = now < slowUntil && state === 'play'; if (document.body.classList.contains('bullet') !== bt) document.body.classList.toggle('bullet', bt);
+  const hy = now < turboUntil && state === 'play'; if (document.body.classList.contains('hyper') !== hy) document.body.classList.toggle('hyper', hy);
+  const mir = now < mirrorUntil; if (document.body.classList.contains('mirror') !== mir) document.body.classList.toggle('mirror', mir);
+}
 
 // Obstáculo: dura 5 s y se desvanece. 10 % de las veces aparece justo delante de la cabeza (game over).
 // 🧱 Campo de obstáculos: cubre el 40 % de las casillas libres durante 5 s y se desvanece.
@@ -1502,11 +1852,15 @@ window.addEventListener('keydown', e => {
     case 'KeyL': rain(); break;
     case 'KeyT': turbo(); break;
     case 'KeyG': mega(); break;
-    case 'KeyO': obstacle(); break;
+    case 'KeyO': meteorRain(); break;
     case 'KeyK': scissors(); break;
     case 'KeyU': roulette(); break;
     case 'KeyV': rose(); break;
-    case 'KeyE': shield(); break;
+    case 'KeyE': mirror(); break;
+    case 'KeyJ': spawnRival(); break;
+    case 'KeyX': spawnPortals(); break;
+    case 'KeyZ': bomb(); break;
+    case 'KeyY': magnet(); break;
     case 'KeyC': slowmo(); break;
     case 'KeyN': blackout(); break;
     case 'KeyQ': quake(); break;
@@ -1563,8 +1917,8 @@ $('muteBtn').onclick = e => { initAudio(); toggleMute(); e.currentTarget.blur();
 $('rainBtn').onclick = e => { initAudio(); rain(); e.currentTarget.blur(); };
 $('turboBtn').onclick = e => { initAudio(); turbo(); e.currentTarget.blur(); };
 $('megaBtn').onclick = e => { initAudio(); mega(); e.currentTarget.blur(); };
-$('obstBtn').onclick = e => { initAudio(); obstacle(); e.currentTarget.blur(); };
-[['wheelBtn',() => roulette()],['scisBtn',() => scissors()],['poisonBtn',() => rose()],['shieldBtn',() => shield()],['slowBtn',() => slowmo()],['darkBtn',() => blackout()],['quakeBtn',() => quake()]]
+$('obstBtn').onclick = e => { initAudio(); meteorRain(); e.currentTarget.blur(); };
+[['wheelBtn',() => roulette()],['scisBtn',() => scissors()],['poisonBtn',() => rose()],['rivalBtn',() => spawnRival()],['portalBtn',() => spawnPortals()],['bombBtn',() => bomb()],['mirrorBtn',() => mirror()],['magnetBtn',() => magnet()],['slowBtn',() => slowmo()],['darkBtn',() => blackout()],['quakeBtn',() => quake()]]
   .forEach(([id,fn]) => $(id).onclick = e => { initAudio(); fn(); e.currentTarget.blur(); });
 $('resetHiBtn').onclick = e => { hiHuman = 0; hiBot = 0; wins = 0; losses = 0; streak = 0; saveHi(); updateHud(); e.currentTarget.blur(); };
 
@@ -1775,12 +2129,31 @@ function renderMain(){
   ctx.fillStyle = tension ? `hsl(${50 + Math.sin(t*12)*10},100%,60%)` : `hsl(${baseHue},100%,60%)`;
   ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 10; ctx.fillRect(ox, oy + bh - 4, bw*progK, 4); ctx.shadowBlur = 0;
 
+  drawPortals();
+  drawMeteors();
   // frutas
   for (const f of foods){
     const age = Math.max(0, Math.min(1, (now - f.born)/250));
     const pulse = 1 + Math.sin(t*9 + f.x)*0.12;
     const r = cell*(f.mega ? 0.48 : 0.34)*pulse*(0.3 + 0.7*age);
-    const x = ox + (f.x+.5)*cell, y = oy + (f.y+.5)*cell - (1-age)*cell*2;
+    let x = ox + (f.x+.5)*cell, y = oy + (f.y+.5)*cell - (1-age)*cell*2;
+    if (f.mt && now - f.mt < 260){ const k = (now - f.mt)/260; x = ox + (f.px + (f.x - f.px)*k + .5)*cell; y = oy + (f.py + (f.y - f.py)*k + .5)*cell; }
+    if (f.drop){ const k = Math.min(1, (now - f.born)/600), y1 = oy + (f.y+.5)*cell; y = oy - cell*2 + (y1 - oy + cell*2)*k*k;
+      if (k < 1){ const g = ctx.createLinearGradient(x, y - cell*4, x, y); g.addColorStop(0, 'rgba(255,210,60,0)'); g.addColorStop(1, 'rgba(255,230,120,0.9)');
+        ctx.strokeStyle = g; ctx.lineWidth = cell*0.25; ctx.beginPath(); ctx.moveTo(x, y - cell*4); ctx.lineTo(x, y); ctx.stroke(); }
+      else if (!f.landed){ f.landed = true; burst(x, y, 48, 8, 3); } }
+    if (f.bomb){
+      const left = Math.max(0, f.until - now), hurry = left < 3000, br = cell*0.38*(1 + (hurry ? Math.abs(Math.sin(now*0.02))*0.15 : 0));
+      ctx.fillStyle = hurry && Math.floor(now/120) % 2 ? '#ff2233' : '#1b1b22'; ctx.shadowColor = '#ff3300'; ctx.shadowBlur = hurry ? 26 : 12;
+      ctx.beginPath(); ctx.arc(x, y, br, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#c9a36b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + br*0.5, y - br*0.7); ctx.quadraticCurveTo(x + br, y - br*1.4, x + br*1.3, y - br*1.2); ctx.stroke();
+      ctx.fillStyle = `hsl(${40 + Math.random()*20},100%,${60 + Math.random()*30}%)`; ctx.beginPath(); ctx.arc(x + br*1.3, y - br*1.2, 2 + Math.random()*2.5, 0, 6.28); ctx.fill();
+      if (Math.random() < 0.4) parts.push({ x: x + br*1.3, y: y - br*1.2, vx: (Math.random()-.5)*2, vy: -Math.random()*2, life: .5, decay: .06, hue: 40, size: 2, kind: 2 });
+      const fs = Math.max(11, cell*0.5); ctx.font = `900 ${fs}px "Segoe UI",system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff'; ctx.fillText(Math.ceil(left/1000), x, y + 1);
+      ctx.strokeStyle = hurry ? '#ff3344' : '#ffaa00'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, cell*0.62, -Math.PI/2, -Math.PI/2 + 6.283*left/BOMB_MS); ctx.stroke();
+      continue;
+    }
     const col = f.mega ? `hsl(${(t*200)%360},100%,60%)` : `hsl(${f.hue},100%,58%)`;
     ctx.shadowColor = col; ctx.shadowBlur = f.mega ? 30 : 18;
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
@@ -1791,6 +2164,7 @@ function renderMain(){
       const ty = f.y === 0 ? y + r + fs + 2 : y - r - 3;
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(f.name, x, ty); ctx.fillStyle = `hsl(${f.hue},100%,82%)`; ctx.fillText(f.name, x, ty);
     }
+    if (f.gold && Math.random() < 0.08) parts.push({ x: x + (Math.random()-.5)*cell*.6, y: y + (Math.random()-.5)*cell*.6, vx: 0, vy: -0.5, life: .6, decay: .04, hue: 48, size: 2, kind: 2 });
     if (f.mega){
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       for (let a=0;a<3;a++){ const st = t*4 + a*2.094; ctx.beginPath(); ctx.arc(x, y, r*1.6, st, st + 1.2); ctx.stroke(); }
@@ -1804,6 +2178,7 @@ function renderMain(){
     const appear = Math.min(1, age/150), fade = o.hit ? 1 : Math.min(1, (ttlOf(o) - age)/Math.min(1500, ttlOf(o)*0.4));
     const a = Math.max(0, appear*fade), m = cell*0.08, blink = 0.75 + Math.sin(age*0.02)*0.25;
     ctx.globalAlpha = a;
+    if (o.meteor){ if (now >= o.born) drawCrater(x, y, age, ttlOf(o)); ctx.globalAlpha = 1; continue; }
     ctx.shadowColor = '#ff1744'; ctx.shadowBlur = obstacles.length < 30 ? 22*blink : 0;
     ctx.fillStyle = `rgba(255,40,80,${0.95*blink})`; rrect(ctx, x+m, y+m, cell-2*m, cell-2*m, cell*0.15);
     ctx.shadowBlur = 0;
@@ -1848,7 +2223,7 @@ function renderMain(){
     if (ghost) ctx.globalAlpha = i < 4 ? 1 : 0.07;
     ctx.fillStyle = segCol(i, hue, i===0 ? 68 : 58);
     rrect(ctx, x+p, y+p, cell-2*p, cell-2*p, rr);
-    if (i > 0){ // puente con el segmento anterior para que sea continua
+    if (i > 0 && Math.abs(snake[i-1].x - s.x) + Math.abs(snake[i-1].y - s.y) === 1){ // puente con el segmento anterior para que sea continua
       const a = snake[i-1], bx = Math.min(a.x, s.x), by = Math.min(a.y, s.y);
       if (a.x !== s.x) ctx.fillRect(ox + bx*cell + cell/2, y + p, cell, cell - 2*p);
       else ctx.fillRect(x + p, oy + by*cell + cell/2, cell - 2*p, cell);
@@ -1928,14 +2303,10 @@ function renderMain(){
     ctx.strokeStyle = `hsla(190,100%,65%,${0.6 + Math.sin(t*6)*0.3})`; ctx.lineWidth = 2 + shields;
     ctx.shadowColor = '#0ff'; ctx.shadowBlur = 16; ctx.beginPath(); ctx.arc(hx, hy, cell*0.85, 0, Math.PI*2); ctx.stroke(); ctx.shadowBlur = 0;
   }
-  // apagón
-  if (now < darkUntil && snake.length){
-    const h = snake[0], hx = ox+(h.x+.5)*cell, hy = oy+(h.y+.5)*cell;
-    const left = darkUntil - now, k = Math.min(1, (10000 - left)/400, left/600), r = cell*3.2;
-    const gr = ctx.createRadialGradient(hx, hy, r*0.35, hx, hy, r);
-    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${0.96*k})`);
-    ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
-  }
+  drawRival();
+  drawMagnet();
+  { const tt = performance.now(); drawSpeedFx(Math.min(100, tt - (renderMain.lt || tt))); renderMain.lt = tt; }
+  drawBlackout();
   pixelate();
   drawModFx(t);
   drawWheel();
@@ -1963,7 +2334,10 @@ function renderMain(){
   let info = score + ' frutas · ' + sps.toFixed(0) + ' p/s';
   if (now < turboUntil) info += '  ⚡TURBO ' + Math.ceil((turboUntil - now)/1000) + 's';
   if (now < slowUntil) info += '  🐢 ' + Math.ceil((slowUntil - now)/1000) + 's';
-  if (shields) info += '  🛡️x' + shields;
+  if (now < goldUntil) info += '  ✨x2 ' + Math.ceil((goldUntil - now)/1000) + 's';
+  if (now < mirrorUntil) info += '  🪞 ' + Math.ceil((mirrorUntil - now)/1000) + 's';
+  if (now < magnetUntil) info += '  🧲 ' + Math.ceil((magnetUntil - now)/1000) + 's';
+  if (portals) info += '  🌀 ' + Math.ceil((portalUntil - now)/1000) + 's';
   if (mod) info += '  ' + mod.ico + ' ' + mod.name;
   if (roseCombo && now - roseLast < ROSE_WINDOW) info += '  🌹 COMBO x' + roseCombo + ' (' + Math.ceil((ROSE_WINDOW - (now - roseLast))/1000) + 's)';
   if (!bot && combo >= 2 && now - lastEat < 1500) info += '  COMBO x' + (combo+1);
@@ -2026,7 +2400,7 @@ function logic(t){
     }
     for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > ttlOf(obstacles[i]) && !obstacles[i].hit) obstacles.splice(i,1);
     if (now < quakeUntil){ shake = Math.max(shake, 16); quakeT -= dt; if (quakeT <= 0){ quakeT = 120; burst(ox + Math.random()*cols*cell, oy + Math.random()*rows*cell, 20 + Math.random()*30, 12, 4); } }
-    updateWheel(); modTick(dt); callTick(); lifeTick(); bossTick(dt);
+    updateWheel(); modTick(dt); callTick(); lifeTick(); bossTick(dt); eventsTick(dt);
     updateFx(dt);
   }
 }
@@ -2054,8 +2428,8 @@ requestAnimationFrame(frame);
    y este juego la recibe por el WebSocket de Streamer.bot (ws://127.0.0.1:8080/ por defecto). */
 const SB_EVENTS = [
   ['ruleta', roulette], ['lluvia', rain], ['mega', mega], ['turbo', turbo],
-  ['lent', slowmo], ['apagon', blackout], ['minado', () => obstacle()], ['bloque', () => obstacle()], ['obstaculo', () => obstacle()],
-  ['terremoto', quake], ['tijera', scissors], ['veneno', () => rose()], ['rosa', () => rose()], ['maldicion', () => rose()], ['escudo', shield]
+  ['lent', slowmo], ['apagon', blackout], ['minado', () => obstacle()], ['bloque', () => meteorRain()], ['meteor', () => meteorRain()], ['obstaculo', () => meteorRain()], ['rival', () => spawnRival()], ['portal', spawnPortals], ['bomba', bomb], ['espejo', mirror], ['iman', magnet],
+  ['terremoto', quake], ['tijera', scissors], ['veneno', () => rose()], ['rosa', () => rose()], ['maldicion', () => rose()]
 ];
 const sbNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 /* Acción única "Snake Evento": TikFinity gratis solo deja 5 acciones, así que una sola acción
@@ -2089,9 +2463,10 @@ function sbSmart(a){
   const toks = [...new Set(text.replace(/!\s*snake/g, ' ').replace(/[^a-z0-9ñ ]/g, ' ').split(/\s+/).filter(Boolean))];
   if (toks.length === 1 && /^[123]$/.test(toks[0]) && castVote(+toks[0], nick(a))) return 'voto ' + toks[0];
   if (toks.length && toks.length <= 5){
-    const CMDS = [['turbo', turbo], ['lent', slowmo], ['apag', blackout], ['bloque', () => obstacle()], ['ruleta', roulette], ['lluvia', rain], ['mascota', () => pet(nick(a))]];
+    const CMDS = [['turbo', turbo], ['lent', slowmo], ['apag', blackout], ['bloque', () => meteorRain()], ['meteor', () => meteorRain()], ['ruleta', roulette], ['lluvia', rain], ['mascota', () => pet(nick(a))],
+      ['rival', () => spawnRival(nick(a))], ['portal', spawnPortals], ['bomba', bomb], ['espejo', mirror], ['iman', magnet]];
     const cmd = CMDS.find(([k]) => toks.some(t => t.startsWith(k)));
-    if (cmd){ cmd[1](); if (cmd[0] !== 'mascota') chatEv('cmd_' + cmd[0], a); return 'comando'; }
+    if (cmd){ cmd[1](); if (cmd[0] !== 'mascota' && cmd[0] !== 'rival') chatEv('cmd_' + cmd[0], a); return 'comando'; }
   }
   if (text.trim()){
     if (/(como|que|donde).{0,12}(particip|jueg|hago|hacer|funcion|comando|interact)|ayuda|help|comandos|no entiendo/.test(text)) chatHelp(nick(a));
@@ -2154,12 +2529,12 @@ function sbWho(o){
 /* ---------- cartel para los espectadores: qué pueden hacer ---------- */
 const LEGEND = [
   '❤️ 100 LIKES → 🎰 RULETA',
-  '❤️ 300 LIKES → 🍎 LLUVIA DE MANZANAS',
+  '❤️ 300 LIKES → ✨ LLUVIA DORADA (x2)',
   '❤️ 1000 LIKES → ✂️ TIJERAS (¡LA MITAD!)',
   '➕ SÍGUEME → 🌋 TERREMOTO',
   '🔁 COMPARTE → 🎁 ¡SORPRESA!',
   '🌹 ROSA → MALDICIÓN · 5 SEGUIDAS = 🥀 JARDÍN MALDITO',
-  '💬 ESCRIBE: turbo · lento · apagon · bloque · ruleta · mascota',
+  '💬 ESCRIBE: turbo · lento · apagon · bloque · rival · portal · bomba · espejo · iman · ruleta · mascota',
   '🗳️ VOTA LA PRÓXIMA PARTIDA: escribe 1, 2 o 3',
   '💔 SI VA A MORIR: ¡50 ❤️ LA SALVAN!'
 ];
@@ -2210,11 +2585,13 @@ function chatEv(kind, a){
     rose:   [`🌹 ${who} lanzó la MALDICIÓN DE LA ROSA 😈 ¡5 rosas seguidas = 🥀 JARDÍN MALDITO!`, `🌹 ¡${who} maldijo a la serpiente! Combo de rosas: a la 5.ª vuelve a empezar 🥀`],
     gift:   [`🎁 ¡Gracias ${who} por el regalo! 🎰 Ruleta`],
     likes100:  [`🎰 ¡100 likes más! Gira la RULETA 🎰 Seguid dando ❤️`],
-    likes300:  [`🍎 ¡300 likes! LLUVIA DE MANZANAS 🍎🍎🍎`],
+    likes300:  [`✨ ¡300 likes! LLUVIA DORADA: frutas x2 ✨`],
     likes1000: [`✂️ ¡1000 likes! TIJERAS: la serpiente pierde la mitad 😵`],
-    cmd_turbo: [`⚡ ${who} activó el TURBO`], cmd_lent: [`🐢 ${who} puso CÁMARA LENTA`],
-    cmd_apagon: [`🌑 ${who} apagó las luces…`], cmd_bloque: [`🧱 ${who} llenó el tablero de OBSTÁCULOS 😬`],
-    cmd_ruleta: [`🎰 ${who} giró la RULETA`], cmd_lluvia: [`🍎 ${who} pidió LLUVIA`]
+    cmd_turbo: [`⚡ ${who} activó el HIPERESPACIO`], cmd_lent: [`⏱️ ${who} activó el TIEMPO BALA`],
+    cmd_apagon: [`🌑 ${who} apagó las luces… solo queda la linterna 🔦`], cmd_bloque: [`☄️ ${who} provocó una LLUVIA DE METEORITOS 😱`], cmd_meteor: [`☄️ ${who} provocó una LLUVIA DE METEORITOS 😱`],
+    cmd_ruleta: [`🎰 ${who} giró la RULETA`], cmd_lluvia: [`✨ ${who} pidió LLUVIA DORADA (frutas x2)`],
+    cmd_portal: [`🌀 ${who} abrió PORTALES`], cmd_bomba: [`💣 ${who} puso una FRUTA BOMBA: 10 s para comérsela o ¡BUM!`],
+    cmd_espejo: [`🪞 ${who} dio la vuelta a la pantalla 🙃`], cmd_iman: [`🧲 ${who} activó el IMÁN`]
   };
   if (M[kind]){ const msg = pick(M[kind]); chatSay(msg, kind.startsWith('likes') ? 2 : 1); feedPush(msg); }
 }
@@ -2230,6 +2607,7 @@ function chatLoss(c, st){
 const CHAT_TIPS = [
   '❤️ Cada 100 likes giramos la RULETA 🎰 ¡Prueba tu suerte! · 300 = 🍎 lluvia · 1000 = ✂️ tijeras',
   '💬 Escribe en el chat: turbo, lento, apagon, bloque o ruleta ¡y cambia la partida! 🐍 · mascota = mini serpiente con tu nombre 🐣',
+  '🐍 Escribe rival y suelta una serpiente con TU nombre que le roba frutas · bomba = fruta bomba 💣 · espejo = pantalla al revés 🪞',
   '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = maldición (5 seguidas = 🥀 jardín maldito) · 🔁 Comparte = 🎁 sorpresa',
   '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈',
   '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀 🎬 🌊) ¡y la eliges tú! Vota escribiendo 1, 2 o 3 🗳️'
@@ -2259,7 +2637,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > ttlOf(obstacles[i]) && !obstacles[i].hit) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, toggleFinale, get finale(){ return finale; }, track, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { meteorRain, meteorDrop, spawnRival, spawnPortals, bomb, mirror, magnet, get rival(){ return rival; }, get portals(){ return portals; }, get head(){ return snake[0] && { x: snake[0].x, y: snake[0].y }; }, _events(dt){ eventsTick(dt); }, get foods(){ return foods; }, step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > ttlOf(obstacles[i]) && !obstacles[i].hit) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, toggleFinale, get finale(){ return finale; }, track, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
