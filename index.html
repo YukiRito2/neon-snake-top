@@ -114,6 +114,7 @@
     <button id="loseSndBtn">🎵 Sonido al perder</button>
     <button id="loseSndClr">🚫 Quitar sonido</button>
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
+    <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
     <button id="legendBtn">📋 Cartel espectadores (I)</button>
     <button id="resetHiBtn">🗑 Borrar marcador</button>
   </div>
@@ -144,7 +145,7 @@ const store = {
   set(k, v){ try{ localStorage.setItem('neonsnake_'+k, JSON.stringify(v)); }catch(e){} }
 };
 // Calibrado: con cuadrícula 16 (~400-430 casillas) una partida ganada dura ~10-12 min
-const DEF = { sps:12, inc:0.14, maxSps:42, grid:16, vol:60, panel:false, muted:false, goalP:100, winRate:30, legend:true };
+const DEF = { sps:12, inc:0.14, maxSps:42, grid:16, vol:60, panel:false, muted:false, goalP:100, winRate:30, legend:true, chat:true };
 const S = Object.assign({}, DEF, store.get('settings3', {}));
 const saveSettings = () => store.set('settings3', S);
 let hiHuman = store.get('hi', 0) | 0, hiBot = store.get('hiBot', 0) | 0, wins = store.get('wins', 0) | 0, losses = store.get('losses', 0) | 0;
@@ -332,11 +333,13 @@ function die(tx, ty){
     label: killedBy.startsWith('obst') ? '💥 ¡OBSTÁCULO!' : killedBy === 'wall' ? '💀 ¡CONTRA LA PARED!' : killedBy === 'body' ? '💀 ¡SE MORDIÓ!' : '💀 ¡NOOO!' };
   burst((px + crashPt.hx)/2, (py + crashPt.hy)/2, 350, 50, 6);
   ring(px, py, 350, cell*6, 5);
+  if (bot){ const st = streak; setTimeout(() => chatLoss(crashPt, st), 0); }
   if (bot) losses++; streak = 0;
   sCrash(); playLoseSound(); saveHi(); updateHud();
 }
 function victory(){
   state = 'won'; deadAt = now; wins++; streak++; shake = 16; pulse = 1;
+  if (bot) setTimeout(chatWin, 0);
   confetti(260);
   const h = snake[0], hx = ox+(h.x+.5)*cell, hy = oy+(h.y+.5)*cell;
   for (let i=0;i<4;i++) setTimeout(() => ring(hx, hy, (i*90+50)%360, cell*(8 + i*5), 4), i*140);
@@ -1228,19 +1231,20 @@ function sbSmart(a){
   sbLast = Object.keys(a).filter(k => !/^(__|actionId|actionName|runningActionId|eventSource)/.test(k)).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · ');
   if (gift || type.includes('gift')){
     const rose = /rose|rosa/.test(sbNorm(gift)) || str('giftId') === '5655' || str('coins') === '1';
-    if (rose){ const n = Math.min(3, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) setTimeout(poison, i*1200); }
-    else roulette();
+    if (rose){ const n = Math.min(3, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) setTimeout(poison, i*1200); chatEv('rose', a); }
+    else { roulette(); chatEv('gift', a); }
     return 'regalo';
   }
   if (likes > 0 || type.includes('like')){
     const before = likeAcc; likeAcc += (likes > 0 ? likes : 1);
     for (const [step, fn] of LIKE_RULES){ const k = Math.floor(likeAcc/step) - Math.floor(before/step); for (let i=0;i<Math.min(k,3);i++) setTimeout(fn, i*900); }
+    const hit = LIKE_RULES.find(([step]) => Math.floor(likeAcc/step) > Math.floor(before/step)); if (hit) chatEv('likes' + hit[0], a);
     return 'likes';
   }
   const cmd = [['turbo', turbo], ['lent', slowmo], ['apagon', blackout], ['bloque', () => obstacle()], ['ruleta', roulette], ['lluvia', rain]].find(([k]) => text.includes(k));
-  if (cmd){ cmd[1](); return 'comando'; }
-  if (type.includes('share') || type.includes('compart')){ mega(); return 'compartir'; }
-  if (type.includes('follow') || type.includes('segu') || !text.trim()){ quake(); return 'follow'; }
+  if (cmd){ cmd[1](); chatEv('cmd_' + cmd[0], a); return 'comando'; }
+  if (type.includes('share') || type.includes('compart')){ mega(); chatEv('share', a); return 'compartir'; }
+  if (type.includes('follow') || type.includes('segu') || !text.trim()){ quake(); chatEv('follow', a); return 'follow'; }
   roulette(); return 'otro';
 }
 function sbTrigger(name, who, args){
@@ -1258,10 +1262,11 @@ function sbTrigger(name, who, args){
   if (!hit) return false;
   { const el = $('sbLast'); if (el) el.textContent = 'Último: ' + name + ' · ' + Object.keys(a).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · '); }
   initAudio(); hit[1]();
+  if (hit[0] === 'terremoto') chatEv('follow', a);
   if (who) addFloat(W/2, H*0.4 + Math.min(44, W/10), '@' + String(who).slice(0, 24), 300, Math.min(22, W/18));
   return true;
 }
-let sbOk = false;
+let sbOk = false, sbWs = null;
 function sbStatus(t, ok){ const el = $('sbStat'); if (el){ el.textContent = 'Streamer.bot: ' + t; el.style.color = ok ? '#4f8' : ''; } }
 function sbFindName(o, depth){
   if (!o || typeof o !== 'object' || depth > 4) return null;
@@ -1276,7 +1281,7 @@ function sbWho(o){
 (function sbConnect(){
   const url = new URLSearchParams(location.search).get('sb') || 'ws://127.0.0.1:8080/';
   let ws;
-  try { ws = new WebSocket(url); } catch(e){ sbStatus('no disponible', false); return; }
+  try { ws = sbWs = new WebSocket(url); } catch(e){ sbStatus('no disponible', false); return; }
   ws.onopen = () => {
     sbOk = true; sbStatus('conectado ✔', true);
     ws.send(JSON.stringify({ request:'Subscribe', id:'neonsnake', events:{ Raw:['Action'] } }));
@@ -1320,9 +1325,65 @@ $('legend').classList.toggle('hidden', !S.legend);
 $('legTxt').textContent = LEGEND[legI++];
 setInterval(legendTick, 4500); setInterval(legendLikes, 500);
 
+/* ---------- mensajes al chat de TikTok (Streamer.bot → chatbot de TikFinity) ----------
+   El juego pide a Streamer.bot que ejecute la acción "Snake Chat" con el texto; esa acción lo
+   reenvía al chatbot de TikFinity. Máx. 1 mensaje cada 15 s para que TikTok no lo filtre. */
+const CHAT_GAP = 15000, chatQ = [];
+let chatLast = 0, chatTipI = 0;
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const nick = a => { const n = a && (a.nickname || a.username || a.userName || a.user); return n ? '@' + String(n).slice(0, 24) : 'Alguien'; };
+function chatSay(msg, prio){
+  if (!S.chat) return;
+  if (chatQ.some(m => m.msg === msg)) return;
+  chatQ.push({ msg, prio: prio|0, t: Date.now() });
+  chatQ.sort((x, y) => y.prio - x.prio);
+  if (chatQ.length > 4) chatQ.length = 4;
+}
+function chatPump(){
+  const t = Date.now();
+  for (let i = chatQ.length - 1; i >= 0; i--) if (t - chatQ[i].t > 60000) chatQ.splice(i, 1);
+  if (!chatQ.length || t - chatLast < CHAT_GAP || !sbWs || sbWs.readyState !== 1) return;
+  const m = chatQ.shift(); chatLast = t;
+  try { sbWs.send(JSON.stringify({ request:'DoAction', id:'neonsnake-chat', action:{ name:'Snake Chat' }, args:{ message: m.msg.slice(0, 150) } })); } catch(e){}
+}
+function chatEv(kind, a){
+  const who = nick(a);
+  const M = {
+    follow: [`🌋 ${who} siguió y provocó un TERREMOTO 😱`, `🌋 ¡Gracias ${who} por seguir! La serpiente tiembla…`],
+    share:  [`⭐ ${who} compartió y soltó un MEGA ORBE 🙌`, `🔁 ¡Gracias ${who} por compartir!`],
+    rose:   [`☠️ ${who} envenenó a la serpiente con una 🌹 😈`, `🌹 ${who} mandó VENENO… pobre serpiente ☠️`],
+    gift:   [`🎁 ¡Gracias ${who} por el regalo! 🎰 Ruleta`],
+    likes100:  [`🎰 ¡100 likes más! Gira la RULETA 🎰 Seguid dando ❤️`],
+    likes300:  [`🍎 ¡300 likes! LLUVIA DE MANZANAS 🍎🍎🍎`],
+    likes1000: [`✂️ ¡1000 likes! TIJERAS: la serpiente pierde la mitad 😵`],
+    cmd_turbo: [`⚡ ${who} activó el TURBO`], cmd_lent: [`🐢 ${who} puso CÁMARA LENTA`],
+    cmd_apagon: [`🌑 ${who} apagó las luces…`], cmd_bloque: [`🧱 ${who} llenó el tablero de OBSTÁCULOS 😬`],
+    cmd_ruleta: [`🎰 ${who} giró la RULETA`], cmd_lluvia: [`🍎 ${who} pidió LLUVIA`]
+  };
+  if (M[kind]) chatSay(pick(M[kind]), kind.startsWith('likes') ? 2 : 1);
+}
+function chatWin(){
+  chatSay(pick([`🏆 ¡TABLERO COMPLETO! La serpiente GANÓ 🐍🔥 Racha: ${streak}`, `🏆 ¡VICTORIA! ${wins} ganadas hoy. Racha 🔥${streak}`]), 3);
+}
+function chatLoss(c, st){
+  const why = killedBy === 'wall' ? 'chocó contra la pared' : killedBy === 'body' ? 'se mordió' : killedBy.startsWith('obst') ? 'chocó con un obstáculo' : 'murió';
+  chatSay(`💀 ¡${why.toUpperCase()} al ${c ? c.pct : '?'}%!` + (st >= 2 ? ` Se acabó la racha de ${st} 💔` : ' Nueva partida 🔄'), 3);
+}
+const CHAT_TIPS = [
+  '🐍 Dale ❤️: 100 likes = 🎰 ruleta, 300 = 🍎 lluvia, 1000 = ✂️ tijeras',
+  '➕ Sígueme para un 🌋 TERREMOTO · 🌹 Rosa = ☠️ veneno · 🔁 Comparte = sorpresa',
+  '💬 Escribe !snake turbo · !snake lento · !snake apagon · !snake bloque · !snake ruleta'
+];
+setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 5*60*1000);
+setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 60*1000);
+setInterval(chatPump, 1000);
+function setChatBtn(){ $('chatBtn').textContent = '💬 Mensajes al chat: ' + (S.chat ? 'SÍ' : 'NO'); }
+$('chatBtn').onclick = e => { S.chat = !S.chat; if (!S.chat) chatQ.length = 0; saveSettings(); setChatBtn(); e.currentTarget.blur(); };
+setChatBtn();
+
 // API mínima para pruebas / automatización
 window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
-  sbTrigger, get length(){ return snake.length; }, get cells(){ return N; } };
+  sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
 </body>
