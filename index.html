@@ -297,40 +297,49 @@ function spawnFood(type){
 }
 function curSps(){
   // empieza rápido, sube con cada manzana y nunca pasa de la velocidad máxima
-  let sps = Math.min(S.maxSps, S.sps + S.inc*eaten);
-  if (modIs('hielo')) sps *= 0.8;
-  if (modIs('agua')) sps *= 0.85;
-  if (now < turboUntil) sps = Math.min(sps*1.6, S.maxSps*1.3);
-  if (now < slowUntil) sps *= 0.4;
-  if (bot && tension) sps *= 0.55; // cámara lenta cerca de la meta
+  let sps = baseSps();
   if (bot && !doom && ham && obstacles.length && snake.length){
-    // TOP ralentiza (nunca por debajo del 55 %) al acercarse a un obstáculo; si aun así llega, lo rompe
-    const s0 = snake[0].y*cols + snake[0].x, floor = sps*0.55;
+    // TOP ralentiza (nunca por debajo del 55 %) para llegar a cada bloque cuando ya se está desvaneciendo
+    const s0 = snake[0].y*cols + snake[0].x, floor = Math.min(sps, rawSps()*0.55);
     for (const o of obstacles){
       if (o.front || o.hit) continue;
-      const rem = (OBST_MS - (now - o.born))/1000 + 0.45;
+      const rem = (ttlOf(o) - (now - o.born))/1000 + 0.45;
       if (rem <= 0) continue;
       sps = Math.min(sps, Math.max(floor, cyc(s0, o.c)/rem));
     }
   }
   return sps;
 }
+// velocidad de la partida (sin turbo, cámara lenta ni frenazos)
+function rawSps(){
+  let sps = Math.min(S.maxSps, S.sps + S.inc*eaten);
+  if (modIs('hielo')) sps *= 0.8;
+  if (modIs('agua')) sps *= 0.85;
+  return sps;
+}
+// velocidad normal (sin contar los frenazos por obstáculos)
+function baseSps(){
+  let sps = rawSps();
+  if (now < turboUntil) sps = Math.min(sps*1.6, S.maxSps*1.3);
+  if (now < slowUntil) sps *= 0.4;
+  if (bot && tension) sps *= 0.55; // cámara lenta cerca de la meta
+  return sps;
+}
+// distancia mínima (en el recorrido de TOP) a la que puede aparecer un bloque de vida ttl ms para que
+// TOP, sin bajar del 55 % de su velocidad, llegue cuando ya no es peligroso
+const minSafe = ttl => Math.ceil(0.55*rawSps()*(ttl - 1000)/1000) + 6;
+const ttlOf = o => o.ttl || OBST_MS;
 function step(){
   if (forceDir){ dir = forceDir; forceDir = null; }
   else if (bot){ const d = botMove(); if (d) dir = d; }
   else if (queue.length) dir = queue.shift();
   const h = snake[0], nx = h.x + dir.x, ny = h.y + dir.y;
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows){ killedBy = 'wall'; return die(nx, ny); }
-  if (bot && !doom){   // TOP no frena: si llega a un bloque que aún no se ha desvanecido, lo rompe
-    for (let i=obstacles.length-1;i>=0;i--){ const o = obstacles[i];
-      if (o.c === ny*cols + nx && !o.front && obstLive(o)){ obstacles.splice(i,1); const bx = ox+(nx+.5)*cell, by = oy+(ny+.5)*cell;
-        burst(bx, by, 0, 26, 5); ring(bx, by, 0, cell*2.5, 3); addFloat(bx, by - cell, '💥', 0, Math.max(16, cell*0.8)); shake = Math.max(shake, 6); sfx('jefe-impacto', 0.6); } }
-  }
   for (let i=0;i<obstacles.length;i++){
     const o = obstacles[i];
     if (o.c !== ny*cols + nx || !obstLive(o)) continue;
     if (shields > 0){ obstacles.splice(i,1); burst(ox+(nx+.5)*cell, oy+(ny+.5)*cell, 0, 40, 6); useShield('¡OBSTÁCULO DESTRUIDO!'); break; }
-    killedBy = o.front ? 'obst' : 'obst2'; o.hit = true; return die(nx, ny);
+    killedBy = o.boss ? 'obst_jefe' : o.front ? 'obst' : 'obst2'; o.hit = true; return die(nx, ny);
   }
   let fi = -1;
   for (let i=0;i<foods.length;i++) if (foods[i].x === nx && foods[i].y === ny){ fi = i; break; }
@@ -394,7 +403,7 @@ function die(tx, ty){
   if (tx === undefined){ tx = h.x + dir.x; ty = h.y + dir.y; }
   const px = ox + (tx+.5)*cell, py = oy + (ty+.5)*cell;
   crashPt = { x:px, y:py, hx:ox+(h.x+.5)*cell, hy:oy+(h.y+.5)*cell, pct:Math.floor(100*snake.length/N),
-    label: killedBy.startsWith('obst') ? '💥 ¡OBSTÁCULO!' : killedBy === 'wall' ? '💀 ¡CONTRA LA PARED!' : killedBy === 'body' ? '💀 ¡SE MORDIÓ!' : '💀 ¡NOOO!' };
+    label: killedBy === 'obst_jefe' ? '⚔️ ¡EL JEFE LE DIO!' : killedBy.startsWith('obst') ? '💥 ¡OBSTÁCULO!' : killedBy === 'wall' ? '💀 ¡CONTRA LA PARED!' : killedBy === 'body' ? '💀 ¡SE MORDIÓ!' : '💀 ¡NOOO!' };
   burst((px + crashPt.hx)/2, (py + crashPt.hy)/2, 350, 50, 6);
   ring(px, py, 350, cell*6, 5);
   if (bot){ const st = streak; setTimeout(() => chatLoss(crashPt, st), 0); }
@@ -496,7 +505,7 @@ function buildHam(){
   }
 }
 // un obstáculo solo es peligroso desde que aparece hasta 1 s antes de desvanecerse del todo
-const obstLive = o => o.front || o.hit || (now - o.born >= 0 && now - o.born < OBST_MS - 1000);
+const obstLive = o => o.front || o.hit || (now - o.born >= 0 && now - o.born < (o.ttl || OBST_MS) - 1000);
 const cyc = (a, b) => (ham[b] - ham[a] + N) % N; // distancia hacia delante en el ciclo
 
 /* Piloto TOP:
@@ -512,7 +521,7 @@ function botMove(){
   if (doom) return mistakeMove(body);
 
   cur.fill(0); for (let i=0;i<L;i++) cur[body[i]] = L - i + grow;
-  for (const o of obstacles) if (obstLive(o) && o.front) cur[o.c] = 1e9;   // los demás los rompe
+  for (const o of obstacles) if (obstLive(o)) cur[o.c] = 1e9;
   // fruta más cercana siguiendo el ciclo
   let fd = N, tf = null;
   for (const f of foods){ const d = cyc(s, f.y*cols + f.x); if (d < fd){ fd = d; tf = f; } }
@@ -524,7 +533,8 @@ function botMove(){
   if (fd < avail) avail = fd;
   if (avail < 0) avail = 0;
 
-  let oD = N; for (const o of obstacles){ if (!obstLive(o)) continue; const d = cyc(s, o.c); if (d < oD) oD = d; }
+  // con bloques en el tablero no toma atajos: si no, llegaría antes de que se desvanezcan
+  let oD = N; for (const o of obstacles){ if (o.front || o.hit || now - o.born >= ttlOf(o) - 1000) continue; oD = 0; }
   const cx = s % cols, cy = (s - cx)/cols;
   // entre los movimientos seguros, el que más acerca a la fruta en línea recta (parece natural)
   let best = -1, bestD = 0, bestM = 1e9;
@@ -1160,13 +1170,21 @@ function bossShoot(){
   // dispara a una casilla libre lejana en el recorrido de TOP (TOP frena y llega cuando ya se desvaneció)
   const occ = new Uint8Array(N); for (const q of snake) occ[q.y*cols + q.x] = 1; for (const f of foods) occ[f.y*cols + f.x] = 1; for (const o of obstacles) occ[o.c] = 1;
   const h = snake[0], s0 = h.y*cols + h.x, free = [];
-  for (let i=0;i<N;i++){ if (occ[i]) continue; const x = i % cols, y = (i/cols)|0; if (Math.abs(x - h.x) + Math.abs(y - h.y) <= 3 || (ham && bot && cyc(s0, i) < 8)) continue; free.push(i); }
-  if (free.length > 3){
-    const dist = i => (ham && bot) ? cyc(s0, i) : Math.abs(i % cols - h.x) + Math.abs(((i/cols)|0) - h.y);
-    free.sort((a, b) => dist(b) - dist(a));
-    const c = free[(Math.random()*Math.max(1, Math.floor(free.length*0.5)))|0];
-    obstacles.push({ c, born: now + 450, front: false });     // aparece cuando llega el proyectil
-    shots.push({ c, start: now }); sfx('jefe-disparo', 0.8);
+  // bloques del jefe: duran 2,2 s y son mortales. Solo apunta donde TOP puede esquivarlos sin frenar en seco;
+  // si no hay ningún sitio así, el disparo falla y explota contra el borde.
+  const BOSS_TTL = 2200, md = (ham && bot) ? minSafe(BOSS_TTL + 450) + 4 : 6;
+  for (let i=0;i<N;i++){ if (occ[i]) continue; const x = i % cols, y = (i/cols)|0;
+    if (Math.abs(x - h.x) + Math.abs(y - h.y) <= 3) continue;
+    if (ham && bot && cyc(s0, i) < md) continue;
+    free.push(i); }
+  sfx('jefe-disparo', 0.8);
+  if (free.length){
+    const c = free[(Math.random()*free.length)|0];
+    obstacles.push({ c, born: now + 450, front: false, boss: true, ttl: BOSS_TTL });     // aparece cuando llega el proyectil
+    shots.push({ c, start: now });
+  } else {
+    const edge = Math.random() < 0.5 ? ((Math.random()*cols)|0) + (rows - 1)*cols : ((Math.random()*rows)|0)*cols + (Math.random() < 0.5 ? 0 : cols - 1);
+    shots.push({ c: edge, start: now, miss: true });
   }
 
 }
@@ -1198,7 +1216,7 @@ function drawBoss(){
   for (let i=shots.length-1;i>=0;i--){
     const sh = shots[i], k = (now - sh.start)/450;
     const tx = ox + (sh.c % cols + .5)*cell, ty = oy + (((sh.c/cols)|0) + .5)*cell;
-    if (k >= 1){ burst(tx, ty, 350, 18, 4); ring(tx, ty, 350, cell*2, 3); sfx('jefe-impacto', 0.7); shots.splice(i,1); continue; }
+    if (k >= 1){ burst(tx, ty, 350, 18, 4); ring(tx, ty, 350, cell*2, 3); sfx('jefe-impacto', 0.7); if (sh.miss) addFloat(tx, ty - cell, '¡FALLÓ!', 50, Math.max(14, cell*0.7)); shots.splice(i,1); continue; }
     const x = p.x + (tx - p.x)*k, y = p.y + (ty - p.y)*k - Math.sin(k*Math.PI)*cell*3;
     ctx.fillStyle = '#ff3355'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(x, y, Math.max(3, cell*0.22), 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
   }
@@ -1404,21 +1422,23 @@ function obstacle(single){
       out.push(i);
     }
     return out; };
-  let want = single ? 1 : Math.round((N - snake.length - foods.length - obstacles.length) * OBST_FIELD);
+  let fttl = OBST_MS, want = single ? 1 : Math.round((N - snake.length - foods.length - obstacles.length) * OBST_FIELD);
   let free = scan(Math.ceil(curSps()*1.6*(OBST_MS/1000 + 0.6)) + 4);
   // con la serpiente grande casi todo el tablero libre está "delante" en su recorrido: se reduce la zona
   // protegida a ~2 s y TOP frena (curSps) para llegar cuando ya se han desvanecido. Así siempre se ven.
   if (!single && free.length < want && ham && bot){
     // al final casi todas las casillas libres son justo las que va a recorrer: se usan las más lejanas
     // (deja libres las ~40 % más cercanas) y TOP avanza despacio, con tensión, hasta que se desvanecen
-    const all = scan(-1).sort((a, b) => cyc(s0, a) - cyc(s0, b));
-    free = all.slice(Math.max(8, Math.ceil(all.length*0.4)));
+    const md = minSafe(OBST_MS + 350);
+    free = scan(-1).filter(i => cyc(s0, i) >= md);
+    // si casi no caben, el campo dura menos (2,6 s) para poder ponerlo lejos de verdad
+    if (free.length < 6){ fttl = 2600; const md2 = minSafe(fttl + 350); free = scan(-1).filter(i => cyc(s0, i) >= md2); }
     want = Math.min(want, free.length);
   }
   for (let i=free.length-1;i>0;i--){ const j = (Math.random()*(i+1))|0; [free[i],free[j]] = [free[j],free[i]]; }
   if (single) free.sort((a,b) => cyc(s0,b) - cyc(s0,a)), free.length = Math.min(free.length, Math.max(1, Math.ceil(free.length/3))), free.sort(() => Math.random() - .5);
   const picks = free.slice(0, Math.min(want, free.length));
-  for (const c of picks) obstacles.push({ c, born: now + Math.random()*350, front:false });
+  for (const c of picks) obstacles.push({ c, born: now + Math.random()*350, front:false, ttl: fttl });
   if (front >= 0){
     obstacles.push({ c: front, born: now, front:true });
     const px = ox + (front % cols + .5)*cell, py = oy + (((front/cols)|0) + .5)*cell;
@@ -1748,7 +1768,7 @@ function renderMain(){
   // obstáculos (bloques de peligro que se desvanecen)
   for (const o of obstacles){
     const age = Math.max(0, now - o.born), x = ox + (o.c % cols)*cell, y = oy + ((o.c/cols)|0)*cell;
-    const appear = Math.min(1, age/150), fade = o.hit ? 1 : Math.min(1, (OBST_MS - age)/1500);
+    const appear = Math.min(1, age/150), fade = o.hit ? 1 : Math.min(1, (ttlOf(o) - age)/Math.min(1500, ttlOf(o)*0.4));
     const a = Math.max(0, appear*fade), m = cell*0.08, blink = 0.75 + Math.sin(age*0.02)*0.25;
     ctx.globalAlpha = a;
     ctx.shadowColor = '#ff1744'; ctx.shadowBlur = obstacles.length < 30 ? 22*blink : 0;
@@ -1761,7 +1781,7 @@ function renderMain(){
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(x+m, y+m, cell-2*m, cell-2*m);
     // anillo que muestra el tiempo restante
     if (!o.hit){ ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath();
-      ctx.arc(x + cell/2, y + cell/2, cell*0.62, -Math.PI/2, -Math.PI/2 + Math.PI*2*Math.max(0, 1 - age/OBST_MS)); ctx.stroke(); }
+      ctx.arc(x + cell/2, y + cell/2, cell*0.62, -Math.PI/2, -Math.PI/2 + Math.PI*2*Math.max(0, 1 - age/ttlOf(o))); ctx.stroke(); }
     ctx.globalAlpha = 1;
   }
   // serpiente: capa de brillo (glow) barata a baja resolución
@@ -1971,7 +1991,7 @@ function logic(t){
       rainT -= dt;
       while (rainT <= 0 && rainLeft > 0){ rainT += 55; rainLeft--; spawnFood(Math.random() < 0.1 ? 'mega' : null); }
     }
-    for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS && !obstacles[i].hit) obstacles.splice(i,1);
+    for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > ttlOf(obstacles[i]) && !obstacles[i].hit) obstacles.splice(i,1);
     if (now < quakeUntil){ shake = Math.max(shake, 16); quakeT -= dt; if (quakeT <= 0){ quakeT = 120; burst(ox + Math.random()*cols*cell, oy + Math.random()*rows*cell, 20 + Math.random()*30, 12, 4); } }
     updateWheel(); modTick(dt); callTick(); lifeTick(); bossTick(dt);
     updateFx(dt);
@@ -2171,7 +2191,7 @@ function chatWin(){
 }
 function chatLoss(c, st){
   feedPush('💀 Murió al ' + (c ? c.pct : '?') + '%');
-  const why = killedBy === 'wall' ? 'chocó contra la pared' : killedBy === 'body' ? 'se mordió' : killedBy.startsWith('obst') ? 'chocó con un obstáculo' : 'murió';
+  const why = killedBy === 'wall' ? 'chocó contra la pared' : killedBy === 'body' ? 'se mordió' : killedBy === 'obst_jefe' ? 'el jefe la derrotó' : killedBy.startsWith('obst') ? 'chocó con un obstáculo' : 'murió';
   chatSay(`💀 ¡${why.toUpperCase()} al ${c ? c.pct : '?'}%!` + (st >= 2 ? ` Se acabó la racha de ${st} 💔` : ' Nueva partida 🔄'), 3);
 }
 const CHAT_TIPS = [
@@ -2206,7 +2226,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, toggleFinale, get finale(){ return finale; }, track, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > ttlOf(obstacles[i]) && !obstacles[i].hit) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, toggleFinale, get finale(){ return finale; }, track, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
