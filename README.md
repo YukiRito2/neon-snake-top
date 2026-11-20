@@ -75,3 +75,9 @@ Guarda tu sonido meme como **`perder.mp3`** en la misma carpeta que `index.html`
 ## Panel (tecla H)
 
 Velocidad inicial, aumento por manzana, velocidad máxima, tamaño de cuadrícula (más grande = partidas más largas), meta (% del tablero), % de victorias de TOP y volumen.
+
+## 🎲 Modificadores de partida y votación
+
+Cada partida empieza con una regla especial: 👻 Fantasma, 🪩 Disco (likes x2), 🧊 Hielo, 🔥 Infierno, 🌙 Noche o 🍀 Suerte.
+El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por persona; empate o sin votos = azar).
+10 s después de empezar y luego cada ~100 s, el widget se convierte durante 20 s en un solo bloque gigante de votación y el bot lo anuncia en el chat.

@@ -210,7 +210,7 @@ function reset(){
   for (let i=0;i<4;i++){ const c = hamCell[(k0 - i + N) % N]; snake.push({ x:c % cols, y:(c/cols)|0 }); }
   dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
   obstacles = []; forceDir = null; killedBy = ''; shields = 0; foods = []; grow = 0; score = 0; eaten = 0; combo = 0; hunger = 0; acc = 0; rainLeft = 0;
-  botUsed = bot; rollFate();
+  botUsed = bot; rollFate(); startMod();
   queue = queue.filter(d => !(d.x === -dir.x && d.y === -dir.y)).slice(0,1);
   spawnFood();
   state = (bot || queue.length) ? 'play' : 'ready';
@@ -249,6 +249,7 @@ function spawnFood(type){
 function curSps(){
   // empieza rápido, sube con cada manzana y nunca pasa de la velocidad máxima
   let sps = Math.min(S.maxSps, S.sps + S.inc*eaten);
+  if (modIs('hielo')) sps *= 0.8;
   if (now < turboUntil) sps = Math.min(sps*1.6, S.maxSps*1.3);
   if (now < slowUntil) sps *= 0.4;
   if (bot && tension) sps *= 0.55; // cámara lenta cerca de la meta
@@ -622,6 +623,110 @@ function poison(){
   addFloat(W/2, H*0.4, '🌹☠️ ¡VENENO! -' + cut.length, 110, Math.min(38, W/12));
   tone(300, .5, 'sawtooth', .14, 80); tone(320, .5, 'square', .06, 90, .05);
 }
+/* ---------- 🎲 MODIFICADORES DE PARTIDA + votación del chat ----------
+   Cada partida empieza con una regla especial. Mientras se juega, el chat vota la de la
+   siguiente comentando !snake 1, !snake 2 o !snake 3 (un voto por persona; empate o sin votos = azar). */
+const MODS = [
+  { id:'fantasma', ico:'👻', name:'FANTASMA', desc:'la cola casi no se ve' },
+  { id:'disco',    ico:'🪩', name:'DISCO',    desc:'colores locos y los ❤️ cuentan DOBLE' },
+  { id:'hielo',    ico:'🧊', name:'HIELO',    desc:'va más lenta, pero caen bloques de hielo' },
+  { id:'infierno', ico:'🔥', name:'INFIERNO', desc:'salen espinas cada pocos segundos' },
+  { id:'noche',    ico:'🌙', name:'NOCHE',    desc:'solo se ve cerca de la cabeza' },
+  { id:'suerte',   ico:'🍀', name:'SUERTE',   desc:'la ruleta solo da cosas buenas' }
+];
+let mod = null, modShowAt = -1e9, modT = 0, voteOpts = [], voters = {};
+const modIs = id => !!mod && mod.id === id;
+function voteCounts(){ const c = [0,0,0]; for (const k in voters) c[voters[k]-1]++; return c; }
+function openVote(){
+  const pool = MODS.filter(m => m !== mod).sort(() => Math.random() - .5);
+  voteOpts = pool.slice(0, 3); voters = {};
+  const txt = voteOpts.map((m, i) => `${i+1} ${m.ico} ${m.name}`).join(' · ');
+  callNext = now + 10000; callN = 0;
+}
+// "Llamada a votar": cada cierto tiempo el widget se convierte en un solo bloque gigante de votación
+// y el bot lo anuncia en el chat. La primera llega 10 s después de empezar y luego cada ~100 s.
+let callNext = 1e18, callUntil = 0, callN = 0;
+const CALL_MSGS = [
+  o => `🗳️ ¡TÚ ELIGES la próxima partida! Comenta !snake 1 ${o[0]} · !snake 2 ${o[1]} · !snake 3 ${o[2]}`,
+  o => `⏳ ¡Vota ya! !snake 1 ${o[0]} · 2 ${o[1]} · 3 ${o[2]} ¿Qué le toca a la serpiente? 😈`,
+  o => `🗳️ La votación sigue abierta: !snake 1, 2 o 3 · ${o[0]} vs ${o[1]} vs ${o[2]} ¡Decide tú!`
+];
+function callTick(){
+  if (!voteOpts.length || state !== 'play' || now < callNext) return;
+  callUntil = now + 20000; callNext = now + 100000;
+  const o = voteOpts.map(m => m.ico + ' ' + m.name);
+  try { chatSay(CALL_MSGS[callN++ % CALL_MSGS.length](o), 1); } catch(e){}
+}
+function castVote(n, who){
+  if (!voteOpts.length || !(n >= 1 && n <= 3)) return false;
+  const key = who && who !== 'Alguien' ? who : 'anon' + Math.random();
+  voters[key] = n;
+  const m = voteOpts[n-1]; addFloat(W/2, H*0.3, '🗳️ ' + (who || '') + ' → ' + m.ico + ' ' + m.name, 140, Math.min(24, W/18));
+  tone(660, .08, 'square', .06); return true;
+}
+function startMod(){
+  let choice;
+  if (voteOpts.length){
+    const c = voteCounts(), best = Math.max(...c);
+    const tied = voteOpts.filter((m, i) => c[i] === best);
+    choice = tied[(Math.random()*tied.length)|0];
+  } else choice = MODS[(Math.random()*MODS.length)|0];
+  mod = choice; modShowAt = now; modT = 4000;
+  setTimeout(() => { try { chatSay(`🎲 Nueva partida: ${mod.ico} ${mod.name} (${mod.desc})`, 1); } catch(e){} }, 0);
+  openVote();
+}
+function modTick(dt){
+  if (!mod || state !== 'play') return;
+  modT -= dt; if (modT > 0) return;
+  if (modIs('infierno')){ modT = 6000; obstacle(true); }
+  else if (modIs('hielo')){ modT = 18000; for (let i=0;i<3;i++) setTimeout(() => obstacle(true), i*300); }
+  else modT = 1e9;
+}
+function drawModFx(t){
+  if (!mod) return;
+  if (modIs('noche') && snake.length && state !== 'dead'){
+    const h = snake[0], hx = ox+(h.x+.5)*cell, hy = oy+(h.y+.5)*cell, r = cell*6;
+    const gr = ctx.createRadialGradient(hx, hy, r*0.4, hx, hy, r);
+    gr.addColorStop(0, 'rgba(0,0,10,0)'); gr.addColorStop(1, 'rgba(0,0,10,0.9)');
+    ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
+  }
+  const tint = modIs('infierno') ? '255,60,0' : modIs('hielo') ? '120,210,255' : modIs('disco') ? `${Math.sin(t*8)>0?'255,0,200':'0,200,255'}` : null;
+  if (tint){
+    const gr = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.7);
+    gr.addColorStop(0, `rgba(${tint},0)`); gr.addColorStop(1, `rgba(${tint},${modIs('disco') ? 0.16 : 0.22})`);
+    ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
+  }
+}
+function drawModUi(){
+  // cartel de inicio de partida
+  const el = now - modShowAt;
+  if (mod && el < 3800){
+    const a = Math.min(1, el/200, (3800 - el)/500), bw = Math.min(W*0.9, 560), s = Math.min(1, bw/560), pop = 1 + Math.max(0, 1 - el/250)*0.3;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(W/2, oy + rows*cell*0.5); ctx.scale(pop, pop);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.strokeStyle = `hsl(${(el/4)%360},100%,60%)`; ctx.lineWidth = 4; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 24;
+    rrect(ctx, -bw/2, -75*s, bw, 150*s, 20*s); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.font = `900 ${22*s}px "Segoe UI",system-ui,sans-serif`; ctx.fillStyle = '#ffe08a'; ctx.fillText('🎲 ESTA PARTIDA', 0, -42*s);
+    ctx.font = `900 ${50*s}px "Segoe UI",system-ui,sans-serif`; ctx.fillStyle = `hsl(${(el/4)%360},100%,70%)`; ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18;
+    ctx.fillText(mod.ico + ' ' + mod.name, 0, 5*s); ctx.shadowBlur = 0;
+    ctx.font = `800 ${21*s}px "Segoe UI",system-ui,sans-serif`; ctx.fillStyle = '#fff'; ctx.fillText(mod.desc, 0, 48*s);
+    ctx.restore();
+  }
+  // votación (esquina inferior derecha del tablero)
+  if (voteOpts.length && state === 'play' && el > 3800){
+    const c = voteCounts(), fs = Math.max(11, Math.min(16, cell*0.5)), pad = fs*0.6;
+    const lines = ['🗳️ PRÓXIMA · comenta !snake 1 2 3'].concat(voteOpts.map((m, i) => `${i+1}  ${m.ico} ${m.name}   ${c[i]}`));
+    ctx.font = `800 ${fs}px "Segoe UI",system-ui,sans-serif`;
+    const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + pad*2, bh = lines.length*fs*1.35 + pad*1.2;
+    const x = ox + cols*cell - bw - 8, y = oy + rows*cell - bh - 8;
+    const calling = now < callUntil;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.strokeStyle = calling ? `hsl(${(now/5)%360},100%,60%)` : 'rgba(255,224,138,0.6)'; ctx.lineWidth = calling ? 3 : 1.5;
+    rrect(ctx, x, y, bw, bh, fs*0.6); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    const best = Math.max(...c);
+    lines.forEach((l, i) => { ctx.fillStyle = i === 0 ? '#ffe08a' : (best > 0 && c[i-1] === best ? '#4dff88' : '#fff'); ctx.fillText(l, x + pad, y + pad*0.6 + i*fs*1.35); });
+  }
+}
 // 🌹 MALDICIÓN DE LA ROSA (el regalo de pago): mucho más dura que el veneno y con COMBO.
 // Cada rosa corta un trozo grande, mete espinas, acelera y pone el nombre del que la mandó en grande.
 // Rosas seguidas (menos de 45 s entre una y otra) suben el combo: -30 % · -40 % · -50 % · -60 %
@@ -701,8 +806,9 @@ function roulette(){ wheelQueue = Math.min(wheelQueue + 1, 5); if (!wheelSpin) n
 function nextSpin(){
   if (wheelQueue <= 0){ wheelSpin = null; return; }
   wheelQueue--;
-  let r = Math.random()*WHEEL.reduce((a,w) => a + w[1], 0), pick = WHEEL[0];
-  for (const w of WHEEL){ r -= w[1]; if (r <= 0){ pick = w; break; } }
+  const wl = modIs('suerte') ? WHEEL.filter(w => /LLUVIA|MEGA|LENTA/.test(w[0])) : WHEEL;
+  let r = Math.random()*wl.reduce((a,w) => a + w[1], 0), pick = wl[0];
+  for (const w of wl){ r -= w[1]; if (r <= 0){ pick = w; break; } }
   wheelSpin = { pick, start: now, idx: 0, lastTick: 0 };
 }
 function updateWheel(){
@@ -996,7 +1102,7 @@ function render(){
 
   const sps = curSps();
   const speedK = Math.min(1, Math.max(0, (sps - 8)/40));
-  const baseHue = (175 + eaten*7 + t*(state === 'won' ? 400 : bot ? 60 : 15) + speedK*120) % 360;
+  const baseHue = (175 + eaten*7 + t*(state === 'won' ? 400 : modIs('disco') ? 320 : bot ? 60 : 15) + speedK*120) % 360;
   hueNow = baseHue;
   const ch = Math.round(baseHue/3);
   if (ch !== cssHue){ cssHue = ch; const rs = document.documentElement.style; rs.setProperty('--h', ch*3); rs.setProperty('--h2', (ch*3 + 130) % 360); }
@@ -1072,7 +1178,7 @@ function render(){
     ctx.globalAlpha = 1;
   }
   // serpiente: capa de brillo (glow) barata a baja resolución
-  const dead = state === 'dead', L = (dead && deathBoom) ? 0 : snake.length;
+  const dead = state === 'dead', L = (dead && deathBoom) ? 0 : snake.length, ghost = modIs('fantasma') && !dead;
   const deadEl = dead ? now - deadAt : 0;
   const deadFlash = dead && deadEl < 280 && Math.floor(deadEl/70) % 2 === 0;
   const greyUpTo = dead ? Math.max(0, (deadEl - 280)/1500)*L : -1;     // se apaga desde la cabeza
@@ -1080,7 +1186,7 @@ function render(){
   g1x.setTransform(1,0,0,1,0,0); g1x.clearRect(0,0,g1.width,g1.height);
   g1x.setTransform(.25,0,0,.25,0,0);
   const e = cell*0.3;
-  for (let i=L-1;i>=0;i--){
+  for (let i=(ghost ? Math.min(L, 4) : L)-1;i>=0;i--){
     const s = snake[i];
     g1x.fillStyle = segCol(i, (baseHue + i*2.5)%360, 55);
     g1x.fillRect(ox + s.x*cell - e, oy + s.y*cell - e, cell + 2*e, cell + 2*e);
@@ -1099,6 +1205,7 @@ function render(){
   for (let i=L-1;i>=0;i--){
     const s = snake[i], x = ox + s.x*cell, y = oy + s.y*cell;
     const hue = (baseHue + i*2.5) % 360;
+    if (ghost) ctx.globalAlpha = i < 4 ? 1 : 0.07;
     ctx.fillStyle = segCol(i, hue, i===0 ? 68 : 58);
     rrect(ctx, x+p, y+p, cell-2*p, cell-2*p, rr);
     if (i > 0){ // puente con el segmento anterior para que sea continua
@@ -1107,9 +1214,10 @@ function render(){
       else ctx.fillRect(x + p, oy + by*cell + cell/2, cell - 2*p, cell);
     }
   }
+  ctx.globalAlpha = 1;
   if (!dead){
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    for (let i=L-1;i>=0;i--){ const s = snake[i]; ctx.fillRect(ox + s.x*cell + core, oy + s.y*cell + core, cell - 2*core, cell - 2*core); }
+    for (let i=(ghost ? Math.min(L, 4) : L)-1;i>=0;i--){ const s = snake[i]; ctx.fillRect(ox + s.x*cell + core, oy + s.y*cell + core, cell - 2*core, cell - 2*core); }
   }
   // cabeza
   if (L){
@@ -1188,7 +1296,9 @@ function render(){
     gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${0.96*k})`);
     ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
   }
+  drawModFx(t);
   drawWheel();
+  drawModUi();
   drawRose();
   // textos flotantes
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1209,6 +1319,7 @@ function render(){
   if (now < turboUntil) info += '  ⚡TURBO ' + Math.ceil((turboUntil - now)/1000) + 's';
   if (now < slowUntil) info += '  🐢 ' + Math.ceil((slowUntil - now)/1000) + 's';
   if (shields) info += '  🛡️x' + shields;
+  if (mod) info += '  ' + mod.ico + ' ' + mod.name;
   if (roseCombo && now - roseLast < ROSE_WINDOW) info += '  🌹 COMBO x' + roseCombo + ' (' + Math.ceil((ROSE_WINDOW - (now - roseLast))/1000) + 's)';
   if (!bot && combo >= 2 && now - lastEat < 1500) info += '  COMBO x' + (combo+1);
   ctx.fillText(info, ox + 4, oy + 4);
@@ -1272,7 +1383,7 @@ function logic(t){
     }
     for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS && !obstacles[i].hit) obstacles.splice(i,1);
     if (now < quakeUntil){ shake = Math.max(shake, 16); quakeT -= dt; if (quakeT <= 0){ quakeT = 120; burst(ox + Math.random()*cols*cell, oy + Math.random()*rows*cell, 20 + Math.random()*30, 12, 4); } }
-    updateWheel();
+    updateWheel(); modTick(dt); callTick();
     updateFx(dt);
   }
 }
@@ -1323,11 +1434,13 @@ function sbSmart(a){
     return 'regalo';
   }
   if (likes > 0 || type.includes('like')){
-    const before = likeAcc; likeAcc += (likes > 0 ? likes : 1);
+    const before = likeAcc; likeAcc += (likes > 0 ? likes : 1) * (modIs('disco') ? 2 : 1);
     for (const [step, fn] of LIKE_RULES){ const k = Math.floor(likeAcc/step) - Math.floor(before/step); for (let i=0;i<Math.min(k,3);i++) setTimeout(fn, i*900); }
     const hit = LIKE_RULES.find(([step]) => Math.floor(likeAcc/step) > Math.floor(before/step)); if (hit) chatEv('likes' + hit[0], a);
     return 'likes';
   }
+  const vm = text.match(/(?:^|[^0-9])([123])(?:[^0-9]|$)/);
+  if (vm && castVote(+vm[1], nick(a))) return 'voto ' + vm[1];
   const cmd = [['turbo', turbo], ['lent', slowmo], ['apagon', blackout], ['bloque', () => obstacle()], ['ruleta', roulette], ['lluvia', rain]].find(([k]) => text.includes(k));
   if (cmd){ cmd[1](); chatEv('cmd_' + cmd[0], a); return 'comando'; }
   if (type.includes('share') || type.includes('compart')){ mega(); chatEv('share', a); return 'compartir'; }
@@ -1392,7 +1505,8 @@ const LEGEND = [
   '➕ SÍGUEME → 🌋 TERREMOTO',
   '🔁 COMPARTE → 🎁 ¡SORPRESA!',
   '🌹 ROSA → MALDICIÓN · 5 SEGUIDAS = 🥀 JARDÍN MALDITO',
-  '💬 !snake turbo · lento · apagon · bloque · ruleta'
+  '💬 !snake turbo · lento · apagon · bloque · ruleta',
+  '🗳️ VOTA LA PRÓXIMA PARTIDA: !snake 1 · 2 · 3'
 ];
 let legI = 0;
 function toggleLegend(){ S.legend = !S.legend; saveSettings(); $('legend').classList.toggle('hidden', !S.legend); layout(); }
@@ -1462,7 +1576,8 @@ const CHAT_TIPS = [
   '❤️ Cada 100 likes giramos la RULETA 🎰 ¡Prueba tu suerte! · 300 = 🍎 lluvia · 1000 = ✂️ tijeras',
   '💬 Comenta !snake turbo, !snake lento, !snake apagon, !snake bloque o !snake ruleta ¡y cambia la partida! 🐍',
   '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = maldición (5 seguidas = 🥀 jardín maldito) · 🔁 Comparte = 🎁 sorpresa',
-  '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈'
+  '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈',
+  '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀) ¡y la eliges tú! Vota con !snake 1, 2 o 3 🗳️'
 ];
 setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
 setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 30*1000);
@@ -1478,7 +1593,7 @@ function publishLive(){
   try {
     localStorage.setItem('neonsnake_live', JSON.stringify({
       at: Date.now(), likes: likeAcc, wins, losses, streak, hi: hiBot, pct: N ? Math.floor(100*snake.length/N) : 0,
-      state, sb: sbOk, feed
+      state, sb: sbOk, feed, mod: mod ? mod.ico + ' ' + mod.name : '', vote: voteOpts.map((m, i) => ({ n: i+1, t: m.ico, nm: m.name, d: m.desc, v: voteCounts()[i] })), call: now < callUntil ? Math.ceil((callUntil - now)/1000) : 0
     }));
   } catch(e){}
 }
@@ -1486,7 +1601,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
