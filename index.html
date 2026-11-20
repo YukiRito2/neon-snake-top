@@ -167,11 +167,12 @@
     <button id="dnBtn">🌗 Día y noche: SÍ</button>
     <button id="widgetBtn">🪟 Abrir widget de datos</button>
     <button id="legendBtn">📋 Cartel espectadores (I)</button>
+    <button id="finaleBtn">🎆 Despedida del directo (Ç)</button>
     <button id="resetHiBtn">🗑 Borrar marcador</button>
   </div>
   <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
   <div class="keys" id="sbLast" style="word-break:break-all"></div>
-  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
+  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · Ç: despedida del directo · M: sonido · R: reiniciar · F: pantalla completa</div>
 </div>
 
 <div id="pad">
@@ -200,6 +201,7 @@ const DEF = { sps:12, inc:0.14, maxSps:42, grid:16, vol:60, panel:false, muted:f
 const S = Object.assign({}, DEF, store.get('settings3', {}));
 const saveSettings = () => store.set('settings3', S);
 let hiHuman = store.get('hi', 0) | 0, hiBot = store.get('hiBot', 0) | 0, wins = store.get('wins', 0) | 0, losses = store.get('losses', 0) | 0;
+const sessWins0 = wins, sessLoss0 = losses;   // para el resumen de la despedida (solo este directo)
 
 /* ---------- estado ---------- */
 const DX = [1,-1,0,0], DY = [0,0,1,-1];
@@ -1202,6 +1204,67 @@ function drawBoss(){
   }
 }
 
+/* ---------- 🎆 DESPEDIDA DEL DIRECTO: fuegos artificiales, resumen y los que más participaron ---------- */
+const sess = { people: {}, roses: 0, follows: 0, winsAt: null, lossAt: null };
+function track(a, kind){
+  const n = nick(a); if (!n || n === 'Alguien') { if (kind === 'regalo') sess.roses++; return; }
+  const p = sess.people[n] || (sess.people[n] = { n, pts: 0, likes: 0, roses: 0, msgs: 0 });
+  const likes = parseInt(a.likeCount, 10) || 0;
+  if (kind === 'likes'){ p.likes += likes || 1; p.pts += likes || 1; }
+  else if (kind === 'regalo'){ const r = Math.max(1, parseInt(a.repeatCount, 10) || 1); p.roses += r; p.pts += 60*r; sess.roses += r; }
+  else if (kind === 'follow'){ p.pts += 25; sess.follows++; }
+  else if (kind === 'compartir'){ p.pts += 25; }
+  else if (kind !== 'saludo'){ p.msgs++; p.pts += 5; }
+}
+let finale = null, fwk = [], fwkT = 0;
+function toggleFinale(){
+  if (finale){ finale = null; fwk = []; return; }
+  if (sess.winsAt === null){ sess.winsAt = 0; sess.lossAt = 0; }
+  const top = Object.values(sess.people).sort((a, b) => b.pts - a.pts).slice(0, 5);
+  finale = { start: now, top, wins: wins - sessWins0, losses: losses - sessLoss0, likes: likeAcc, roses: sess.roses, follows: sess.follows };
+  [523,659,784,1047,1319,1568].forEach((f,i) => tone(f, .22, 'triangle', .1, null, i*.12));
+  try {
+    const names = top.slice(0, 3).map(p => p.n).join(', ');
+    chatSay(`🎆 ¡GRACIAS a todos por el directo! 🐍 ${finale.wins} victorias · ${finale.likes} ❤️` + (names ? ` · Top: ${names} 👑` : '') + ' ¡Nos vemos en el próximo!', 3);
+  } catch(e){}
+}
+function drawFinale(dt){
+  if (!finale) return;
+  const el = now - finale.start, k = Math.min(1, el/600);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle = `rgba(0,0,8,${0.93*k})`; ctx.fillRect(0, 0, W, H);
+  // fuegos artificiales
+  fwkT -= dt;
+  if (fwkT <= 0){ fwkT = 260 + Math.random()*380;
+    fwk.push({ x: W*(0.1 + Math.random()*0.8), y: H + 10, vy: -(H*0.012 + Math.random()*H*0.006), ty: H*(0.12 + Math.random()*0.4), hue: (Math.random()*360)|0, boom: false, parts: [] });
+    tone(300 + Math.random()*200, .25, 'sine', .03, 900); }
+  for (let i=fwk.length-1;i>=0;i--){ const f = fwk[i];
+    if (!f.boom){ f.y += f.vy*dt/16.67; ctx.fillStyle = `hsl(${f.hue},100%,75%)`; ctx.fillRect(f.x - 1.5, f.y, 3, 10);
+      if (f.y <= f.ty){ f.boom = true; for (let j=0;j<70;j++){ const a = Math.random()*6.28, v = 1 + Math.random()*4; f.parts.push({ x: f.x, y: f.y, vx: Math.cos(a)*v, vy: Math.sin(a)*v, life: 1 }); } tone(90 + Math.random()*60, .35, 'sawtooth', .05, 40); } }
+    else { let alive = 0; for (const p of f.parts){ if (p.life <= 0) continue; alive++; p.x += p.vx*dt/16.67; p.y += p.vy*dt/16.67; p.vy += 0.05*dt/16.67; p.vx *= 0.985; p.life -= 0.012*dt/16.67;
+        ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = `hsl(${(f.hue + (1-p.life)*60)%360},100%,${55 + p.life*25}%)`; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, 6.28); ctx.fill(); }
+      ctx.globalAlpha = 1; if (!alive) fwk.splice(i,1); }
+  }
+  // textos
+  const s = Math.min(1, W/900), cx = W/2; let y = H*0.14;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const line = (t, size, col, glow) => { ctx.font = `900 ${size*s}px "Segoe UI",system-ui,sans-serif`; ctx.lineWidth = size*s*0.14; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(t, cx, y);
+    ctx.fillStyle = col; ctx.shadowColor = glow || col; ctx.shadowBlur = 18; ctx.fillText(t, cx, y); ctx.shadowBlur = 0; y += size*s*1.35; };
+  ctx.globalAlpha = k;
+  line('🎆 ¡GRACIAS POR VENIR! 🎆', 58, `hsl(${(el/8)%360},100%,70%)`);
+  line('Nos vemos en el próximo directo 🐍', 28, '#fff', '#0ff');
+  y += 10*s;
+  line(`🏆 ${finale.wins}   💀 ${finale.losses}   ❤️ ${finale.likes.toLocaleString('es')}   🌹 ${finale.roses}   ➕ ${finale.follows}`, 30, '#ffe08a', '#ff9d00');
+  y += 14*s;
+  if (finale.top.length){
+    line('⭐ LOS QUE MÁS PARTICIPARON ⭐', 26, '#ffd36b', '#ffb300');
+    const medals = ['🥇','🥈','🥉','🏅','🏅'];
+    finale.top.forEach((p, i) => { if (el > 700 + i*450) line(`${medals[i]} ${p.n}` + (p.roses ? `  🌹${p.roses}` : '') + (p.likes ? `  ❤️${p.likes}` : ''), i ? 26 : 34, i ? '#fff' : '#ffd700'); else y += (i ? 26 : 34)*s*1.35; });
+  }
+  if (crown){ y += 8*s; line('👑 Corona: ' + crown, 24, '#ffd36b'); }
+  ctx.globalAlpha = 1;
+}
+
 // 🌹 MALDICIÓN DE LA ROSA (el regalo de pago): mucho más dura que el veneno y con COMBO.
 // Cada rosa corta un trozo grande, mete espinas, acelera y pone el nombre del que la mandó en grande.
 // Rosas seguidas (menos de 45 s entre una y otra) suben el combo: -30 % · -40 % · -50 % · -60 %
@@ -1376,6 +1439,7 @@ window.addEventListener('keydown', e => {
   const k = e.code;
   if (KEYMAP[k]){ e.preventDefault(); input(DIRS[KEYMAP[k]]); return; }
   if (e.repeat) return;
+  if (e.key === 'ç' || e.key === 'Ç'){ toggleFinale(); return; }   // tecla ç (teclado español)
   switch (k){
     case 'KeyB': toggleBot(); break;
     case 'KeyH': togglePanel(); break;
@@ -1418,6 +1482,7 @@ document.querySelectorAll('#pad button').forEach(b =>
 
 $('botBtn').onclick = e => { toggleBot(); e.currentTarget.blur(); };
 $('panelBtn').onclick = e => { togglePanel(); e.currentTarget.blur(); };
+$('finaleBtn').onclick = e => { toggleFinale(); e.currentTarget.blur(); };
 /* ---------- menú de pausa ---------- */
 function pmRefresh(){
   $('pmBot').textContent = '🤖 TOP: ' + (bot ? 'SÍ' : 'NO');
@@ -1599,6 +1664,7 @@ function rrect(c, x, y, w, h, r){ if (hasRound){ c.beginPath(); c.roundRect(x, y
 function render(){
   if (state === 'replay' && replay) replayApply();
   renderMain(); postFx(); drawReplay();
+  const ft = performance.now(); drawFinale(Math.min(100, ft - (render.lt || ft))); render.lt = ft;
 }
 function renderMain(){
   const t = now*0.001;
@@ -1988,7 +2054,7 @@ function sbTrigger(name, who, args){
   const hasData = ['giftName','giftId','likeCount','commandParams','comment','message','eventType','triggerType'].some(k => a[k] != null && String(a[k]).trim() !== '');
   if (n.includes('saludo') || n.includes('bienven') || n.includes('join')){ greet(nick(a) !== 'Alguien' ? nick(a) : (who ? '@' + who : 'Alguien')); return true; }
   if (n.includes('evento') || hasData){
-    initAudio(); const kind = sbSmart(args);
+    initAudio(); const kind = sbSmart(args); track(args || {}, kind);
     if (who && kind !== 'charla' && kind !== 'saludo' && !kind.startsWith('voto')) addFloat(W/2, H*0.4 + Math.min(44, W/10), '@' + String(who).slice(0, 24), 300, Math.min(22, W/18));
     const el = $('sbLast'); if (el) el.textContent = 'Último: ' + kind + ' · ' + sbLast;
     return true;
@@ -2140,7 +2206,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, toggleFinale, get finale(){ return finale; }, track, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
