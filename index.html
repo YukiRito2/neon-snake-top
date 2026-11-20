@@ -632,7 +632,8 @@ const MODS = [
   { id:'hielo',    ico:'🧊', name:'HIELO',    desc:'va más lenta, pero caen bloques de hielo' },
   { id:'infierno', ico:'🔥', name:'INFIERNO', desc:'salen espinas cada pocos segundos' },
   { id:'noche',    ico:'🌙', name:'NOCHE',    desc:'solo se ve cerca de la cabeza' },
-  { id:'suerte',   ico:'🍀', name:'SUERTE',   desc:'la ruleta solo da cosas buenas' }
+  { id:'suerte',   ico:'🍀', name:'SUERTE',   desc:'la ruleta solo da cosas buenas' },
+  { id:'cine',     ico:'🎬', name:'CINE NEGRO', desc:'todo en blanco y negro… y muy serio' }
 ];
 let mod = null, modShowAt = -1e9, modT = 0, voteOpts = [], voters = {};
 const modIs = id => !!mod && mod.id === id;
@@ -672,6 +673,8 @@ function startMod(){
     choice = tied[(Math.random()*tied.length)|0];
   } else choice = MODS[(Math.random()*MODS.length)|0];
   mod = choice; modShowAt = now; modT = 4000;
+  document.documentElement.style.filter = modIs('cine') ? 'grayscale(1) contrast(1.25) brightness(1.05)' : '';
+  if (modIs('cine')) tone(110, 1.4, 'triangle', .18, 55);
   setTimeout(() => { try { chatSay(`🎲 Nueva partida: ${mod.ico} ${mod.name} (${mod.desc})`, 1); } catch(e){} }, 0);
   openVote();
 }
@@ -688,6 +691,15 @@ function drawModFx(t){
     const h = snake[0], hx = ox+(h.x+.5)*cell, hy = oy+(h.y+.5)*cell, r = cell*6;
     const gr = ctx.createRadialGradient(hx, hy, r*0.4, hx, hy, r);
     gr.addColorStop(0, 'rgba(0,0,10,0)'); gr.addColorStop(1, 'rgba(0,0,10,0.9)');
+    ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
+  }
+  if (modIs('cine')){
+    // grano de película, rayas y bandas de cine
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i=0;i<140;i++) ctx.fillRect(Math.random()*W, Math.random()*H, 1.5, 1.5);
+    if (Math.random() < 0.35){ ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(Math.random()*W, 0, 1, H); }
+    const gr = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.3, W/2, H/2, Math.max(W,H)*0.7);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.6)');
     ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
   }
   const tint = modIs('infierno') ? '255,60,0' : modIs('hielo') ? '120,210,255' : modIs('disco') ? `${Math.sin(t*8)>0?'255,0,200':'0,200,255'}` : null;
@@ -1577,7 +1589,7 @@ const CHAT_TIPS = [
   '💬 Comenta !snake turbo, !snake lento, !snake apagon, !snake bloque o !snake ruleta ¡y cambia la partida! 🐍',
   '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = maldición (5 seguidas = 🥀 jardín maldito) · 🔁 Comparte = 🎁 sorpresa',
   '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈',
-  '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀) ¡y la eliges tú! Vota con !snake 1, 2 o 3 🗳️'
+  '🎲 Cada partida tiene una regla distinta (👻 🪩 🧊 🔥 🌙 🍀 🎬) ¡y la eliges tú! Vota con !snake 1, 2 o 3 🗳️'
 ];
 setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
 setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 30*1000);
