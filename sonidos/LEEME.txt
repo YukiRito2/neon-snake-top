@@ -1,0 +1,8 @@
+Sonidos de Neon Snake TOP
+
+jefe-aparece.mp3, jefe-disparo.mp3, jefe-impacto.mp3, jefe-derrotado.mp3:
+  hechos a partir del banco de efectos "uisfx" (audio de dominio público, CC0 1.0,
+  https://github.com/romainsimon/uisfx), procesados (más graves, eco, volumen).
+perder.mp3: sintetizado para este juego ("wah wah wah waaah").
+
+Puedes cambiar cualquiera por otro .mp3 con el mismo nombre.

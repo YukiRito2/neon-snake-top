@@ -94,3 +94,5 @@ El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por p
 - **🍎 Frutas con nombre:** las manzanas llevan el nombre de alguien que comentó hace poco; al comérsela sale "¡se comió a @…!".
 - **👑 Corona:** el último que mandó una rosa lleva corona y su nombre encima de la serpiente (se guarda entre partidas) hasta que otro mande una.
 - **⚔️ Jefe final:** al 90 % aparece un jefe que dispara obstáculos a casillas lejanas; TOP frena para esquivarlos (simulación: 80/80 partidas ganadoras sin muertes injustas). Los obstáculos dejan de ser peligrosos 1 s antes de desvanecerse.
+- **Jefe al 70–90 %** (al azar en cada partida) y **sin frenazos:** TOP ralentiza como mucho al 55 %; si llega a un bloque que aún no se ha desvanecido, lo rompe (💥). Sim: 40/40 partidas ganadoras sin muertes injustas, velocidad mínima ~7 p/s.
+- **Sonidos** en la carpeta `sonidos/`: efectos del jefe a partir del banco CC0 [uisfx](https://github.com/romainsimon/uisfx) y un `perder.mp3` propio (ver `sonidos/LEEME.txt`).

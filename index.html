@@ -161,7 +161,7 @@
     <button id="darkBtn">🌑 Apagón (N)</button>
     <button id="quakeBtn">🌋 Terremoto (Q)</button>
     <button id="loseSndBtn">🎵 Sonido al perder</button>
-    <button id="loseSndClr">🚫 Quitar sonido</button>
+    <button id="loseSndClr">↩️ Sonido original</button>
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
     <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
     <button id="replayBtn">📸 Repetición: SÍ</button>
@@ -258,7 +258,7 @@ function reset(){
   for (let i=0;i<4;i++){ const c = hamCell[(k0 - i + N) % N]; snake.push({ x:c % cols, y:(c/cols)|0 }); }
   dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
   obstacles = []; forceDir = null; killedBy = ''; shields = 0; foods = []; grow = 0; score = 0; eaten = 0; combo = 0; hunger = 0; acc = 0; rainLeft = 0;
-  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null; boss = null; bossDone = false; shots = [];
+  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null; boss = null; bossDone = false; shots = []; bossAt = 0.7 + Math.random()*0.2;
   queue = queue.filter(d => !(d.x === -dir.x && d.y === -dir.y)).slice(0,1);
   spawnFood();
   state = (bot || queue.length) ? 'play' : 'ready';
@@ -303,13 +303,13 @@ function curSps(){
   if (now < slowUntil) sps *= 0.4;
   if (bot && tension) sps *= 0.55; // cámara lenta cerca de la meta
   if (bot && !doom && ham && obstacles.length && snake.length){
-    // TOP frena al acercarse a un obstáculo para llegar justo cuando ya se ha desvanecido
-    const s0 = snake[0].y*cols + snake[0].x;
+    // TOP ralentiza (nunca por debajo del 55 %) al acercarse a un obstáculo; si aun así llega, lo rompe
+    const s0 = snake[0].y*cols + snake[0].x, floor = sps*0.55;
     for (const o of obstacles){
       if (o.front || o.hit) continue;
       const rem = (OBST_MS - (now - o.born))/1000 + 0.45;
       if (rem <= 0) continue;
-      sps = Math.min(sps, Math.max(0.12, cyc(s0, o.c)/rem));
+      sps = Math.min(sps, Math.max(floor, cyc(s0, o.c)/rem));
     }
   }
   return sps;
@@ -320,6 +320,11 @@ function step(){
   else if (queue.length) dir = queue.shift();
   const h = snake[0], nx = h.x + dir.x, ny = h.y + dir.y;
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows){ killedBy = 'wall'; return die(nx, ny); }
+  if (bot && !doom){   // TOP no frena: si llega a un bloque que aún no se ha desvanecido, lo rompe
+    for (let i=obstacles.length-1;i>=0;i--){ const o = obstacles[i];
+      if (o.c === ny*cols + nx && !o.front && obstLive(o)){ obstacles.splice(i,1); const bx = ox+(nx+.5)*cell, by = oy+(ny+.5)*cell;
+        burst(bx, by, 0, 26, 5); ring(bx, by, 0, cell*2.5, 3); addFloat(bx, by - cell, '💥', 0, Math.max(16, cell*0.8)); shake = Math.max(shake, 6); sfx('jefe-impacto', 0.6); } }
+  }
   for (let i=0;i<obstacles.length;i++){
     const o = obstacles[i];
     if (o.c !== ny*cols + nx || !obstLive(o)) continue;
@@ -396,6 +401,7 @@ function die(tx, ty){
   sCrash(); playLoseSound(); saveHi(); updateHud();
 }
 function victory(){
+  if (boss && !boss.leaving){ sfx('jefe-derrotado', 1); addFloat(W/2, H*0.3, '⚔️ ¡JEFE DERROTADO!', 50, Math.min(44, W/10)); }
   state = 'won'; deadAt = now; wins++; streak++; shake = 16; pulse = 1;
   if (bot) setTimeout(chatWin, 0);
   confetti(260);
@@ -505,7 +511,7 @@ function botMove(){
   if (doom) return mistakeMove(body);
 
   cur.fill(0); for (let i=0;i<L;i++) cur[body[i]] = L - i + grow;
-  for (const o of obstacles) if (obstLive(o)) cur[o.c] = 1e9;
+  for (const o of obstacles) if (obstLive(o) && o.front) cur[o.c] = 1e9;   // los demás los rompe
   // fruta más cercana siguiendo el ciclo
   let fd = N, tf = null;
   for (const f of foods){ const d = cyc(s, f.y*cols + f.x); if (d < fd){ fd = d; tf = f; } }
@@ -1133,15 +1139,15 @@ function drawCrown(){
 }
 
 /* ---------- ⚔️ JEFE FINAL: al 90 % aparece y lanza obstáculos hasta que la partida termina ---------- */
-let boss = null, bossDone = false, shots = [];
+let boss = null, bossDone = false, shots = [], bossAt = 0.8;
 function bossTick(dt){
   if (state !== 'play'){ if (boss && state !== 'replay'){ boss.leaving = boss.leaving || now; } return; }
-  if (!boss && !bossDone && N && snake.length >= N*0.9){
+  if (!boss && !bossDone && N && snake.length >= N*bossAt){
     bossDone = true; boss = { born: now, next: now + 2500, hits: 0, leaving: 0 };
     shake = Math.max(shake, 22); flash = Math.max(flash, 0.8); pulse = 1;
     addFloat(W/2, H*0.36, '⚔️ ¡JEFE FINAL!', 0, Math.min(52, W/9));
-    tone(55, 1.6, 'sawtooth', .3, 30); tone(82, 1.4, 'square', .12, 41, .1);
-    try { chatSay('⚔️ ¡APARECIÓ EL JEFE FINAL! La serpiente está al 90 %… ¿lo aguantará? 😱', 2); feedPush('⚔️ ¡Jefe final!'); } catch(e){}
+    sfx('jefe-aparece', 1); tone(55, 1.6, 'sawtooth', .12, 30);
+    try { chatSay('⚔️ ¡APARECIÓ EL JEFE FINAL! La serpiente está al ' + Math.floor(100*snake.length/N) + ' %… ¿lo aguantará? 😱', 2); feedPush('⚔️ ¡Jefe final!'); } catch(e){}
   }
   if (boss && !boss.leaving && now >= boss.next){
     boss.next = now + 2600 + Math.random()*1200;
@@ -1158,7 +1164,7 @@ function bossShoot(){
     free.sort((a, b) => dist(b) - dist(a));
     const c = free[(Math.random()*Math.max(1, Math.floor(free.length*0.5)))|0];
     obstacles.push({ c, born: now + 450, front: false });     // aparece cuando llega el proyectil
-    shots.push({ c, start: now }); tone(180, .3, 'sawtooth', .1, 70);
+    shots.push({ c, start: now }); sfx('jefe-disparo', 0.8);
   }
 
 }
@@ -1190,7 +1196,7 @@ function drawBoss(){
   for (let i=shots.length-1;i>=0;i--){
     const sh = shots[i], k = (now - sh.start)/450;
     const tx = ox + (sh.c % cols + .5)*cell, ty = oy + (((sh.c/cols)|0) + .5)*cell;
-    if (k >= 1){ burst(tx, ty, 350, 18, 4); ring(tx, ty, 350, cell*2, 3); shots.splice(i,1); continue; }
+    if (k >= 1){ burst(tx, ty, 350, 18, 4); ring(tx, ty, 350, cell*2, 3); sfx('jefe-impacto', 0.7); shots.splice(i,1); continue; }
     const x = p.x + (tx - p.x)*k, y = p.y + (ty - p.y)*k - Math.sin(k*Math.PI)*cell*3;
     ctx.fillStyle = '#ff3355'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(x, y, Math.max(3, cell*0.22), 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
   }
@@ -1478,6 +1484,17 @@ function initAudio(){
 /* ---------- sonido meme al perder ----------
    Opción 1: deja un archivo llamado "perder.mp3" en la misma carpeta que este index.html.
    Opción 2: botón "🎵 Sonido al perder" del panel (se guarda en el navegador si no es muy grande). */
+// efectos de sonido en archivos (carpeta "sonidos")
+const SFX = {};
+function sfx(name, vol){
+  if (S.muted) return;
+  try {
+    let a = SFX[name]; if (!a){ a = SFX[name] = new Audio('sonidos/' + name + '.mp3'); a.preload = 'auto'; }
+    const c = a.readyState >= 2 ? a.cloneNode() : a; c.volume = Math.min(1, (vol == null ? 1 : vol)*S.vol/100);
+    const pr = c.play(); if (pr && pr.catch) pr.catch(() => {});
+  } catch(e){}
+}
+['jefe-aparece','jefe-disparo','jefe-impacto','jefe-derrotado'].forEach(n => { try { SFX[n] = new Audio('sonidos/' + n + '.mp3'); SFX[n].preload = 'auto'; } catch(e){} });
 let loseAudio = null;
 function setLoseAudio(src, label){
   const a = new Audio(src); a.preload = 'auto';
@@ -1491,7 +1508,9 @@ function playLoseSound(){
 }
 (() => {
   let saved = null; try{ saved = localStorage.getItem('neonsnake_loseSound'); }catch(e){}
-  if (saved) setLoseAudio(saved, 'Sonido: tuyo ✓'); else setLoseAudio('perder.mp3', 'Sonido: perder.mp3 ✓');
+  // v2: el sonido de derrota por defecto ahora viene con el juego (sonidos/perder.mp3)
+  try { if (!localStorage.getItem('neonsnake_loseV2')){ localStorage.setItem('neonsnake_loseV2', '1'); localStorage.removeItem('neonsnake_loseSound'); saved = null; } } catch(e){}
+  if (saved) setLoseAudio(saved, 'Sonido: tuyo ✓'); else setLoseAudio('sonidos/perder.mp3', 'Sonido: perder ✓');
 })();
 $('loseSndBtn').onclick = e => { initAudio(); $('loseFile').click(); e.currentTarget.blur(); };
 $('loseFile').onchange = e => {
@@ -1505,7 +1524,7 @@ $('loseFile').onchange = e => {
   };
   rd.readAsDataURL(f); e.target.value = '';
 };
-$('loseSndClr').onclick = e => { try{ localStorage.removeItem('neonsnake_loseSound'); }catch(err){} loseAudio = null; $('loseSndBtn').textContent = '🎵 Sonido al perder'; e.currentTarget.blur(); };
+$('loseSndClr').onclick = e => { try{ localStorage.removeItem('neonsnake_loseSound'); }catch(err){} setLoseAudio('sonidos/perder.mp3', 'Sonido: perder ✓'); e.currentTarget.blur(); };
 
 function setVol(){ if (master) master.gain.value = S.muted ? 0 : (S.vol/100)*0.6; }
 function tone(f, dur, type, vol, f2, delay){
