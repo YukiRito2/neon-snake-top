@@ -52,6 +52,15 @@
     color:#0ff;font-size:20px;padding:0}
   #pad .u{left:52px;top:0}#pad .d{left:52px;bottom:0}#pad .l{left:0;top:52px}#pad .r{right:0;top:52px}
   @media (pointer:coarse){#pad{display:block}}
+  #legend{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;
+    padding:5px 16px;border-radius:999px;background:rgba(0,0,0,.72);border:1px solid hsla(var(--h),100%,60%,.55);
+    box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:15px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
+  #legend.hidden{display:none}
+  #legTxt{transition:opacity .35s;text-shadow:0 0 8px hsla(var(--h),100%,60%,.9)}
+  #legLikes{display:flex;align-items:center;gap:6px;font-size:12px;color:#ff7aa8;border-left:1px solid rgba(255,255,255,.2);padding-left:12px}
+  #legBar{width:70px;height:7px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
+  #legFill{height:100%;width:0;background:linear-gradient(90deg,#ff2d6f,#ffb3c9);box-shadow:0 0 8px #ff2d6f;transition:width .4s}
+  @media (max-width:520px){#legend{font-size:11px;gap:2px 8px;padding:3px 10px;flex-wrap:wrap;justify-content:center;white-space:normal;text-align:center;border-radius:14px;width:calc(100vw - 16px)}#legLikes{border-left:0;padding-left:0}#legBar{width:60px}}
   #toast{position:fixed;left:50%;top:44px;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:#888;
     pointer-events:none;z-index:5;transition:opacity 1s}
 </style>
@@ -103,16 +112,19 @@
     <button id="loseSndBtn">🎵 Sonido al perder</button>
     <button id="loseSndClr">🚫 Quitar sonido</button>
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
+    <button id="legendBtn">📋 Cartel espectadores (I)</button>
     <button id="resetHiBtn">🗑 Borrar marcador</button>
   </div>
   <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
-  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>O: obstáculo · U: ruleta · K: tijeras · V: veneno · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
+  <div class="keys" id="sbLast" style="word-break:break-all"></div>
+  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: veneno · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
 </div>
 
 <div id="pad">
   <button class="u" data-d="u">▲</button><button class="l" data-d="l">◀</button>
   <button class="r" data-d="r">▶</button><button class="d" data-d="d">▼</button>
 </div>
+<div id="legend"><span id="legTxt"></span><span id="legLikes">❤️ <span id="legBar"><span id="legFill" style="display:block"></span></span> <span id="legNum">0/100</span> 🎰</span></div>
 <div id="toast">B = TOP · H = PANEL</div>
 
 <script>
@@ -130,7 +142,7 @@ const store = {
   set(k, v){ try{ localStorage.setItem('neonsnake_'+k, JSON.stringify(v)); }catch(e){} }
 };
 // Calibrado: con cuadrícula 16 (~400-430 casillas) una partida ganada dura ~10-12 min
-const DEF = { sps:12, inc:0.14, maxSps:42, grid:16, vol:60, panel:false, muted:false, goalP:100, winRate:30 };
+const DEF = { sps:12, inc:0.14, maxSps:42, grid:16, vol:60, panel:false, muted:false, goalP:100, winRate:30, legend:true };
 const S = Object.assign({}, DEF, store.get('settings3', {}));
 const saveSettings = () => store.set('settings3', S);
 let hiHuman = store.get('hi', 0) | 0, hiBot = store.get('hiBot', 0) | 0, wins = store.get('wins', 0) | 0, losses = store.get('losses', 0) | 0;
@@ -154,7 +166,7 @@ function layout(){
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth; H = window.innerHeight;
   cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
-  const top = W <= 520 ? 68 : 42, pad = 6, aw = W - pad*2, ah = H - top - pad;
+  const top = W <= 520 ? 68 : 42, pad = 6, bot = S.legend ? (W <= 520 ? 50 : 36) : pad, aw = W - pad*2, ah = H - top - bot;
   cell = Math.max(6, Math.floor(Math.min(aw, ah) / S.grid));
   let nc = Math.max(6, Math.floor(aw/cell)), nr = Math.max(6, Math.floor(ah/cell));
   if (nc % 2) nc--; if (nr % 2) nr--;   // pares: permite un ciclo con forma de laberinto
@@ -711,6 +723,7 @@ window.addEventListener('keydown', e => {
     case 'KeyN': blackout(); break;
     case 'KeyQ': quake(); break;
     case 'KeyF': fullscreen(); break;
+    case 'KeyI': toggleLegend(); break;
     case 'Space': e.preventDefault(); initAudio(); break;
     default: return;
   }
@@ -1199,11 +1212,49 @@ const SB_EVENTS = [
   ['terremoto', quake], ['tijera', scissors], ['veneno', poison], ['escudo', shield]
 ];
 const sbNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-function sbTrigger(name, who){
+/* Acción única "Snake Evento": TikFinity gratis solo deja 5 acciones, así que una sola acción
+   sirve para todo y el juego decide qué hacer con los datos que le llegan. */
+let likeAcc = 0, sbLast = '';
+const LIKE_RULES = [[1000, scissors, '✂️'], [300, rain, '🍎'], [100, roulette, '🎰']];
+function sbSmart(a){
+  a = a || {};
+  const str = k => (a[k] == null ? '' : String(a[k]));
+  const type = sbNorm(str('eventType') + ' ' + str('triggerType') + ' ' + str('event') + ' ' + str('type') + ' ' + str('__source') + ' ' + str('triggerName'));
+  const gift = str('giftName') || str('giftId');
+  const likes = parseInt(str('likeCount'), 10);
+  const text = sbNorm(str('commandParams') + ' ' + str('comment') + ' ' + str('message') + ' ' + str('command') + ' ' + str('rawInput'));
+  sbLast = Object.keys(a).filter(k => !/^(__|actionId|actionName|runningActionId|eventSource)/.test(k)).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · ');
+  if (gift || type.includes('gift')){
+    const rose = /rose|rosa/.test(sbNorm(gift)) || str('giftId') === '5655' || str('coins') === '1';
+    if (rose){ const n = Math.min(3, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) setTimeout(poison, i*1200); }
+    else roulette();
+    return 'regalo';
+  }
+  if (likes > 0 || type.includes('like')){
+    const before = likeAcc; likeAcc += (likes > 0 ? likes : 1);
+    for (const [step, fn] of LIKE_RULES){ const k = Math.floor(likeAcc/step) - Math.floor(before/step); for (let i=0;i<Math.min(k,3);i++) setTimeout(fn, i*900); }
+    return 'likes';
+  }
+  const cmd = [['turbo', turbo], ['lent', slowmo], ['apagon', blackout], ['bloque', () => obstacle()], ['ruleta', roulette], ['lluvia', rain]].find(([k]) => text.includes(k));
+  if (cmd){ cmd[1](); return 'comando'; }
+  if (type.includes('share') || type.includes('compart')){ mega(); return 'compartir'; }
+  if (type.includes('follow') || type.includes('segu') || !text.trim()){ quake(); return 'follow'; }
+  roulette(); return 'otro';
+}
+function sbTrigger(name, who, args){
   const n = sbNorm(name);
   if (!n.includes('snake')) return false;
+  const a = args || {};
+  const hasData = ['giftName','giftId','likeCount','commandParams','comment','message','eventType','triggerType'].some(k => a[k] != null && String(a[k]).trim() !== '');
+  if (n.includes('evento') || hasData){
+    initAudio(); const kind = sbSmart(args);
+    if (who) addFloat(W/2, H*0.4 + Math.min(44, W/10), '@' + String(who).slice(0, 24), 300, Math.min(22, W/18));
+    const el = $('sbLast'); if (el) el.textContent = 'Último: ' + kind + ' · ' + sbLast;
+    return true;
+  }
   const hit = SB_EVENTS.find(([k]) => n.includes(k));
   if (!hit) return false;
+  { const el = $('sbLast'); if (el) el.textContent = 'Último: ' + name + ' · ' + Object.keys(a).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · '); }
   initAudio(); hit[1]();
   if (who) addFloat(W/2, H*0.4 + Math.min(44, W/10), '@' + String(who).slice(0, 24), 300, Math.min(22, W/18));
   return true;
@@ -1233,11 +1284,36 @@ function sbWho(o){
     if (!m || m.request === 'Hello' || m.id === 'neonsnake') return;
     const d = m.data || m.args || m;
     const name = sbFindName(d, 0);
-    if (name) sbTrigger(name, sbWho(d));
+    if (name) sbTrigger(name, sbWho(d), (d && (d.arguments || d.args)) || {});
   };
   ws.onclose = () => { if (sbOk) sbStatus('desconectado, reintentando…', false); else sbStatus('abre Streamer.bot (reintentando…)', false); sbOk = false; setTimeout(sbConnect, 5000); };
   ws.onerror = () => {};
 })();
+
+/* ---------- cartel para los espectadores: qué pueden hacer ---------- */
+const LEGEND = [
+  '❤️ 100 LIKES → 🎰 RULETA',
+  '❤️ 300 LIKES → 🍎 LLUVIA DE MANZANAS',
+  '❤️ 1000 LIKES → ✂️ TIJERAS (¡LA MITAD!)',
+  '➕ SÍGUEME → 🌋 TERREMOTO',
+  '🔁 COMPARTE → 🎁 ¡SORPRESA!',
+  '🌹 ROSA → ☠️ VENENO',
+  '💬 !snake turbo · lento · apagon · bloque · ruleta'
+];
+let legI = 0;
+function toggleLegend(){ S.legend = !S.legend; saveSettings(); $('legend').classList.toggle('hidden', !S.legend); layout(); }
+function legendTick(){
+  const t = $('legTxt'); t.style.opacity = 0;
+  setTimeout(() => { t.textContent = LEGEND[legI++ % LEGEND.length]; t.style.opacity = 1; }, 350);
+}
+function legendLikes(){
+  const r = likeAcc % 100;
+  $('legFill').style.width = r + '%'; $('legNum').textContent = r + '/100';
+}
+$('legendBtn').onclick = e => { toggleLegend(); e.currentTarget.blur(); };
+$('legend').classList.toggle('hidden', !S.legend);
+$('legTxt').textContent = LEGEND[legI++];
+setInterval(legendTick, 4500); setInterval(legendLikes, 500);
 
 // API mínima para pruebas / automatización
 window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
