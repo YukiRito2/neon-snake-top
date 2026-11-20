@@ -48,6 +48,7 @@
   #panel .btns button{background:rgba(255,0,255,.08);color:#fff;border:1px solid rgba(255,0,255,.45);border-radius:8px;
     padding:7px 4px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer}
   #panel .btns button:hover{background:rgba(255,0,255,.25)}
+  #panel #modBtns button.on{background:hsla(var(--h),100%,50%,.4);border-color:hsl(var(--h),100%,65%)}
   #panel .keys{margin-top:8px;color:#888;font-size:10.5px;line-height:1.5}
   #pad{position:fixed;right:14px;bottom:14px;width:156px;height:156px;z-index:4;display:none;opacity:.16}
   #pad button{position:absolute;width:52px;height:52px;border-radius:12px;border:1px solid #0ff;background:rgba(0,255,255,.08);
@@ -142,6 +143,8 @@
   <input type="range" id="winRate" min="0" max="100" step="5">
   <label>Volumen <span id="volV"></span></label>
   <input type="range" id="vol" min="0" max="100" step="1">
+  <label>🎲 Probar modificador <span id="modV"></span></label>
+  <div class="btns" id="modBtns"></div>
   <div class="btns">
     <button id="rainBtn">🍎 Lluvia (L)</button>
     <button id="turboBtn">⚡ Turbo (T)</button>
@@ -713,12 +716,13 @@ function startMod(){
     const tied = voteOpts.filter((m, i) => c[i] === best);
     choice = tied[(Math.random()*tied.length)|0];
   } else choice = MODS[(Math.random()*MODS.length)|0];
+  if (modLock !== undefined) choice = modLock;          // fijado desde el panel para probar
   applyMod(choice);
   setTimeout(() => { try { chatSay(`🎲 Nueva partida: ${mod.ico} ${mod.name} (${mod.desc})`, 1); } catch(e){} }, 0);
   openVote();
 }
 function applyMod(m){
-  mod = m; modShowAt = now; modT = 4000;
+  mod = m; modShowAt = now; modT = 4000; setTimeout(modPanel, 0);
   document.body.classList.toggle('noir', modIs('cine')); noirOn = true;
   if (modIs('cine')) tone(110, 1.4, 'triangle', .18, 55);
 }
@@ -775,6 +779,19 @@ function drawNoir(dt){
     f2.beginPath(); f2.arc(p.x, p.y, p.r*p.life + 0.4, 0, 6.28); f2.fill();
   }
   f2.shadowBlur = 0; f2.globalCompositeOperation = 'source-over';
+}
+let modLock;   // undefined = normal (votación); un modificador o null = fijado desde el panel
+function modPanel(){
+  const box = $('modBtns'); if (!box) return;
+  if (!box.children.length){
+    const add = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = e => { fn(); modPanel(); e.currentTarget.blur(); }; box.appendChild(b); return b; };
+    for (const m of MODS) add(m.ico + ' ' + m.name, () => { applyMod(m); if (modLock !== undefined) modLock = m; }).dataset.id = m.id;
+    add('🚫 Ninguno', () => { applyMod(null); if (modLock !== undefined) modLock = null; }).dataset.id = '';
+    add('📌 Fijar: NO', () => { modLock = modLock === undefined ? mod : undefined; }).id = 'modLockBtn';
+  }
+  for (const b of box.children) if (b.id !== 'modLockBtn') b.classList.toggle('on', (mod ? mod.id : '') === b.dataset.id);
+  $('modLockBtn').textContent = '📌 Fijar: ' + (modLock !== undefined ? 'SÍ' : 'NO');
+  $('modV').textContent = modLock !== undefined ? 'fijado' : 'votación';
 }
 function rerollMod(){ const pool = MODS.filter(m => m !== mod); applyMod(pool[(Math.random()*pool.length)|0]); }
 function modTick(dt){
