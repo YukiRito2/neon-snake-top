@@ -57,6 +57,8 @@
     box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:15px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
   #legend.hidden{display:none}
   #legTxt{transition:opacity .35s;text-shadow:0 0 8px hsla(var(--h),100%,60%,.9)}
+  #legTot{color:#fff;font-size:14px;text-shadow:0 0 8px #ff2d6f}
+  #legNext{color:#ffd0de}
   #legLikes{display:flex;align-items:center;gap:6px;font-size:12px;color:#ff7aa8;border-left:1px solid rgba(255,255,255,.2);padding-left:12px}
   #legBar{width:70px;height:7px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
   #legFill{height:100%;width:0;background:linear-gradient(90deg,#ff2d6f,#ffb3c9);box-shadow:0 0 8px #ff2d6f;transition:width .4s}
@@ -124,7 +126,7 @@
   <button class="u" data-d="u">▲</button><button class="l" data-d="l">◀</button>
   <button class="r" data-d="r">▶</button><button class="d" data-d="d">▼</button>
 </div>
-<div id="legend"><span id="legTxt"></span><span id="legLikes">❤️ <span id="legBar"><span id="legFill" style="display:block"></span></span> <span id="legNum">0/100</span> 🎰</span></div>
+<div id="legend"><span id="legTxt"></span><span id="legLikes">❤️ <b id="legTot">0</b> <span id="legBar"><span id="legFill" style="display:block"></span></span> <span id="legNext"></span></span></div>
 <div id="toast">B = TOP · H = PANEL</div>
 
 <script>
@@ -1307,8 +1309,11 @@ function legendTick(){
   setTimeout(() => { t.textContent = LEGEND[legI++ % LEGEND.length]; t.style.opacity = 1; }, 350);
 }
 function legendLikes(){
-  const r = likeAcc % 100;
-  $('legFill').style.width = r + '%'; $('legNum').textContent = r + '/100';
+  const left = n => n - (likeAcc % n);
+  $('legFill').style.width = (likeAcc % 100) + '%';
+  $('legTot').textContent = likeAcc.toLocaleString('es');
+  $('legNext').textContent = '🎰 ' + left(100) + ' · 🍎 ' + left(300) + ' · ✂️ ' + left(1000);
+  $('legNext').title = 'likes que faltan';
 }
 $('legendBtn').onclick = e => { toggleLegend(); e.currentTarget.blur(); };
 $('legend').classList.toggle('hidden', !S.legend);
