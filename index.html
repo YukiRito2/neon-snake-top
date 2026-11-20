@@ -58,6 +58,24 @@
     padding:5px 16px;border-radius:999px;background:rgba(0,0,0,.72);border:1px solid hsla(var(--h),100%,60%,.55);
     box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:20px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
   #legend.hidden{display:none}
+  #pauseMenu{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+  #pauseMenu.show{display:flex;animation:pmIn .25s ease-out}
+  @keyframes pmIn{from{opacity:0;transform:scale(1.06)}}
+  #pauseMenu .box{width:min(440px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;padding:22px 22px 16px;border-radius:20px;
+    background:rgba(8,0,20,.9);border:2px solid hsla(var(--h),100%,60%,.8);text-align:center;
+    box-shadow:0 0 30px hsla(var(--h),100%,50%,.45),inset 0 0 24px hsla(var(--h),100%,50%,.12)}
+  #pauseMenu h2{margin:0;font-size:44px;letter-spacing:6px;color:hsl(var(--h),100%,70%);text-shadow:0 0 12px hsl(var(--h),100%,55%),0 0 30px hsl(var(--h),100%,50%)}
+  #pauseMenu .st{margin:6px 0 16px;color:#ccc;font-weight:700;font-size:14px;line-height:1.5}
+  #pauseMenu .st b{color:#fff}
+  #pauseMenu .pm{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #pauseMenu button{font-family:inherit;font-weight:800;font-size:15px;color:#fff;cursor:pointer;padding:11px 6px;border-radius:12px;
+    background:rgba(255,255,255,.06);border:1px solid hsla(var(--h2),100%,65%,.5);transition:background .15s,transform .1s}
+  #pauseMenu button:hover{background:hsla(var(--h2),100%,55%,.25)}
+  #pauseMenu button:active{transform:scale(.96)}
+  #pauseMenu button.big{grid-column:1/-1;font-size:20px;padding:14px;color:#000;border:none;
+    background:linear-gradient(90deg,hsl(var(--h),100%,60%),hsl(var(--h2),100%,62%));box-shadow:0 0 16px hsl(var(--h),100%,50%)}
+  #pauseMenu .hint{margin-top:12px;color:#888;font-size:12px}
   #legTxt{transition:opacity .35s;text-shadow:0 0 8px hsla(var(--h),100%,60%,.9)}
   #legTot{color:#fff;font-size:19px;text-shadow:0 0 8px #ff2d6f}
   #legNext{color:#ffd0de}
@@ -81,9 +99,29 @@
 <div class="corner" id="cornerL">
   <button class="cbtn" id="panelBtn" title="Panel (H)">⚙</button>
   <button class="cbtn" id="muteBtn" title="Sonido (M)">🔊</button>
+  <button class="cbtn" id="pauseBtn" title="Pausa (P / Esc)">⏸</button>
 </div>
 <div class="corner" id="cornerR">
   <button class="cbtn on" id="botBtn" title="Piloto automático (B)">TOP</button>
+</div>
+
+<div id="pauseMenu">
+  <div class="box">
+    <h2>⏸ PAUSA</h2>
+    <div class="st" id="pmStat"></div>
+    <div class="pm">
+      <button class="big" id="pmGo">▶️ CONTINUAR</button>
+      <button id="pmReset">🔄 Reiniciar partida</button>
+      <button id="pmMod">🎲 Otro modificador</button>
+      <button id="pmBot">🤖 TOP: SÍ</button>
+      <button id="pmMute">🔊 Sonido: SÍ</button>
+      <button id="pmWidget">🪟 Abrir widget</button>
+      <button id="pmFull">⛶ Pantalla completa</button>
+      <button id="pmPanel">⚙ Ajustes</button>
+      <button id="pmLegend">📋 Cartel: SÍ</button>
+    </div>
+    <div class="hint">P o Esc para continuar · el directo sigue recibiendo likes y votos</div>
+  </div>
 </div>
 
 <div id="panel">
@@ -124,7 +162,7 @@
   </div>
   <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
   <div class="keys" id="sbLast" style="word-break:break-all"></div>
-  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
+  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
 </div>
 
 <div id="pad">
@@ -672,12 +710,16 @@ function startMod(){
     const tied = voteOpts.filter((m, i) => c[i] === best);
     choice = tied[(Math.random()*tied.length)|0];
   } else choice = MODS[(Math.random()*MODS.length)|0];
-  mod = choice; modShowAt = now; modT = 4000;
-  document.documentElement.style.filter = modIs('cine') ? 'grayscale(1) contrast(1.25) brightness(1.05)' : '';
-  if (modIs('cine')) tone(110, 1.4, 'triangle', .18, 55);
+  applyMod(choice);
   setTimeout(() => { try { chatSay(`🎲 Nueva partida: ${mod.ico} ${mod.name} (${mod.desc})`, 1); } catch(e){} }, 0);
   openVote();
 }
+function applyMod(m){
+  mod = m; modShowAt = now; modT = 4000;
+  document.documentElement.style.filter = modIs('cine') ? 'grayscale(1) contrast(1.25) brightness(1.05)' : '';
+  if (modIs('cine')) tone(110, 1.4, 'triangle', .18, 55);
+}
+function rerollMod(){ const pool = MODS.filter(m => m !== mod); applyMod(pool[(Math.random()*pool.length)|0]); }
 function modTick(dt){
   if (!mod || state !== 'play') return;
   modT -= dt; if (modT > 0) return;
@@ -749,7 +791,7 @@ function rose(who){ roseQ.push(who || ''); if (roseQ.length > 15) roseQ.shift();
 function roseNext(){
   if (!roseQ.length){ roseBusy = false; return; }
   roseBusy = true;
-  if (state !== 'play'){ setTimeout(roseNext, 500); return; }   // espera a que haya partida: ninguna rosa se pierde
+  if (state !== 'play' || paused){ setTimeout(roseNext, 500); return; }   // espera a que haya partida: ninguna rosa se pierde
   roseHit(roseQ.shift()); setTimeout(roseNext, 1800);
 }
 function petals(n){
@@ -917,7 +959,7 @@ window.addEventListener('keydown', e => {
     case 'KeyB': toggleBot(); break;
     case 'KeyH': togglePanel(); break;
     case 'KeyM': toggleMute(); break;
-    case 'KeyP': paused = !paused; break;
+    case 'KeyP': case 'Escape': setPause(!paused); break;
     case 'KeyR': reset(); flash = .4; break;
     case 'KeyL': rain(); break;
     case 'KeyT': turbo(); break;
@@ -955,6 +997,30 @@ document.querySelectorAll('#pad button').forEach(b =>
 
 $('botBtn').onclick = e => { toggleBot(); e.currentTarget.blur(); };
 $('panelBtn').onclick = e => { togglePanel(); e.currentTarget.blur(); };
+/* ---------- menú de pausa ---------- */
+function pmRefresh(){
+  $('pmBot').textContent = '🤖 TOP: ' + (bot ? 'SÍ' : 'NO');
+  $('pmMute').textContent = (S.muted ? '🔇' : '🔊') + ' Sonido: ' + (S.muted ? 'NO' : 'SÍ');
+  $('pmLegend').textContent = '📋 Cartel: ' + (S.legend ? 'SÍ' : 'NO');
+  const pct = N ? Math.floor(100*snake.length/N) : 0;
+  $('pmStat').innerHTML = (mod ? '🎲 Partida: <b>' + mod.ico + ' ' + mod.name + '</b><br>' : '') +
+    '🐍 Tablero lleno: <b>' + pct + '%</b> · 🏆 <b>' + wins + '</b> · 💀 <b>' + losses + '</b>' + (streak >= 2 ? ' · 🔥 <b>' + streak + '</b>' : '');
+}
+function setPause(v){
+  paused = !!v; $('pauseMenu').classList.toggle('show', paused);
+  if (paused){ pmRefresh(); tone(520, .1, 'triangle', .08, 260); } else { lastT = performance.now(); tone(390, .1, 'triangle', .08, 780); }
+}
+$('pauseBtn').onclick = e => { setPause(!paused); e.currentTarget.blur(); };
+$('pauseMenu').onclick = e => { if (e.target.id === 'pauseMenu') setPause(false); };
+$('pmGo').onclick = () => setPause(false);
+$('pmReset').onclick = () => { reset(); flash = .4; setPause(false); };
+$('pmMod').onclick = () => { rerollMod(); setPause(false); };
+$('pmBot').onclick = () => { toggleBot(); pmRefresh(); };
+$('pmMute').onclick = () => { toggleMute(); pmRefresh(); };
+$('pmWidget').onclick = () => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} };
+$('pmFull').onclick = () => fullscreen();
+$('pmPanel').onclick = () => { if (!S.panel) togglePanel(); setPause(false); };
+$('pmLegend').onclick = () => { toggleLegend(); pmRefresh(); };
 $('muteBtn').onclick = e => { initAudio(); toggleMute(); e.currentTarget.blur(); };
 $('rainBtn').onclick = e => { initAudio(); rain(); e.currentTarget.blur(); };
 $('turboBtn').onclick = e => { initAudio(); turbo(); e.currentTarget.blur(); };
@@ -1339,10 +1405,6 @@ function render(){
     ctx.textAlign = 'center'; ctx.font = '700 15px "Segoe UI",system-ui,sans-serif';
     ctx.fillStyle = `rgba(255,255,255,${0.45 + Math.sin(t*4)*0.25})`;
     ctx.fillText('FLECHAS / WASD / DESLIZA PARA JUGAR  ·  B = TOP', W/2, oy + rows*cell*0.72);
-  }
-  if (paused){
-    ctx.textAlign = 'center'; ctx.font = '900 40px "Segoe UI",system-ui,sans-serif';
-    ctx.fillStyle = '#0ff'; ctx.shadowColor = '#0ff'; ctx.shadowBlur = 20; ctx.fillText('PAUSA', W/2, H/2); ctx.shadowBlur = 0;
   }
 
   ctx.setTransform(DPR,0,0,DPR,0,0);
