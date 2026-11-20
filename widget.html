@@ -40,7 +40,8 @@
 
   /* ---- modo franja: ventana ancha y baja (debajo del juego) ---- */
   @media (min-aspect-ratio: 1/1){
-    :root{--u:min(1vh,.28vw)}
+    :root{--u:min(1.3vh,.36vw)}
+    .head{display:none !important}
     html{display:flex;align-items:center}
     body{height:auto !important;width:100%}
     body{flex-direction:row;gap:1.2vw;padding:calc(var(--u)*2.5) 1.2vw;align-items:stretch;justify-content:center}
@@ -91,7 +92,7 @@
 
   <div class="card rules">
     <div class="rule"><span class="k">➕ Sígueme</span><span class="v">🌋 Terremoto</span></div>
-    <div class="rule"><span class="k">🌹 Rosa</span><span class="v">☠️ Veneno</span></div>
+    <div class="rule"><span class="k">🌹 Rosa</span><span class="v">💀 Maldición</span></div>
     <div class="rule"><span class="k">🔁 Comparte</span><span class="v">🎁 Sorpresa</span></div>
     <div class="cmd">💬 Comenta <b>!snake</b> + turbo · lento · apagon · bloque · ruleta</div>
   </div>

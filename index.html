@@ -109,7 +109,7 @@
     <button id="obstBtn">🧱 Obstáculo (O)</button>
     <button id="wheelBtn">🎰 Ruleta (U)</button>
     <button id="scisBtn">✂️ Tijeras (K)</button>
-    <button id="poisonBtn">🌹 Veneno (V)</button>
+    <button id="poisonBtn">🌹 Maldición rosa (V)</button>
     <button id="shieldBtn">🛡️ Escudo (E)</button>
     <button id="slowBtn">🐢 Lenta (C)</button>
     <button id="darkBtn">🌑 Apagón (N)</button>
@@ -124,7 +124,7 @@
   </div>
   <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
   <div class="keys" id="sbLast" style="word-break:break-all"></div>
-  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: veneno · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
+  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
 </div>
 
 <div id="pad">
@@ -622,6 +622,77 @@ function poison(){
   addFloat(W/2, H*0.4, '🌹☠️ ¡VENENO! -' + cut.length, 110, Math.min(38, W/12));
   tone(300, .5, 'sawtooth', .14, 80); tone(320, .5, 'square', .06, 90, .05);
 }
+// 🌹 MALDICIÓN DE LA ROSA (el regalo de pago): mucho más dura que el veneno y con COMBO.
+// Cada rosa corta un trozo grande, mete espinas, acelera y pone el nombre del que la mandó en grande.
+// Rosas seguidas (menos de 45 s entre una y otra) suben el combo: -30 % · -40 % · -50 % · -60 %
+// y la 5.ª desata el 🥀 JARDÍN MALDITO: la serpiente se queda en 4 casillas (sin morir) y vuelve a empezar.
+const ROSE_WINDOW = 45000, ROSE_MAX = 5;
+let roseCombo = 0, roseLast = -1e9, roseFx = null, roseQ = [], roseBusy = false;
+function rose(who){ roseQ.push(who || ''); if (roseQ.length > 15) roseQ.shift(); if (!roseBusy) roseNext(); }
+function roseNext(){
+  if (!roseQ.length){ roseBusy = false; return; }
+  roseBusy = true;
+  if (state !== 'play'){ setTimeout(roseNext, 500); return; }   // espera a que haya partida: ninguna rosa se pierde
+  roseHit(roseQ.shift()); setTimeout(roseNext, 1800);
+}
+function petals(n){
+  for (let i=0;i<n;i++){
+    parts.push({ x: ox + Math.random()*cols*cell, y: oy - Math.random()*H*0.6, vx:(Math.random()-.5)*2, vy:1 + Math.random()*2.5,
+      life:1, decay:0.003 + Math.random()*0.004, hue:(330 + Math.random()*30)%360, size:5 + Math.random()*6, kind:1,
+      rot:Math.random()*6.28, vr:(Math.random()-.5)*0.3 });
+  }
+}
+function roseHit(who){
+  if (now - roseLast > ROSE_WINDOW) roseCombo = 0;
+  roseCombo++; roseLast = now;
+  const lvl = roseCombo, garden = lvl >= ROSE_MAX;
+  roseFx = { start: now, who: who || '', lvl, garden, cut: 0 };
+  petals(garden ? 220 : 70 + lvl*25);
+  quakeUntil = Math.max(quakeUntil, now + (garden ? 2600 : 1100));
+  shake = Math.max(shake, garden ? 32 : 18 + lvl*3); flash = Math.max(flash, garden ? 1 : 0.75);
+  if (state === 'play' && snake.length > 4){
+    const keep = garden ? 4 : Math.max(4, snake.length - Math.max(3, Math.ceil(snake.length*[0, .3, .4, .5, .6][Math.min(lvl, 4)])));
+    const cut = snake.splice(keep); roseFx.cut = cut.length;
+    const stride = Math.max(1, Math.ceil(cut.length/80));
+    for (let i=0;i<cut.length;i+=stride){ const c = cut[i]; burst(ox+(c.x+.5)*cell, oy+(c.y+.5)*cell, 340, 6, 4); }
+    grow = 0; tension = false; milestone = [0,25,50,75,90].filter(m => m <= Math.floor(100*snake.length/N)).pop();
+    if (doom) doom = false;
+    if (fate === 'lose') deathScore = Math.min(goal() - 1, Math.max(prog() + 5, Math.floor(goal()*(0.72 + 0.25*Math.random()))));
+    turboUntil = Math.max(turboUntil, now + (garden ? 12000 : 8000)); slowUntil = 0;
+    const thorns = garden ? 10 : 2 + lvl;
+    for (let i=0;i<thorns;i++) setTimeout(() => obstacle(true), 350 + i*220);
+    const h = snake[0]; ring(ox+(h.x+.5)*cell, oy+(h.y+.5)*cell, 340, cell*(garden ? 16 : 9), 7);
+  }
+  // sonido: acorde oscuro que se hace más grave con el combo
+  const b = 220/Math.pow(1.12, lvl);
+  tone(b, .9, 'sawtooth', .16, b/4); tone(b*1.19, .9, 'square', .07, b/3, .05); tone(b*1.5, .7, 'triangle', .1, null, .12);
+  if (garden){ tone(60, 2, 'sawtooth', .3, 25); [880,740,620,520,440,370].forEach((f,i) => tone(f, .25, 'square', .08, null, .3 + i*.12)); }
+  if (garden) roseCombo = 0;
+}
+function drawRose(){
+  if (!roseFx) return;
+  const el = now - roseFx.start, dur = roseFx.garden ? 5500 : 4000;
+  if (el > dur){ roseFx = null; return; }
+  const a = Math.min(1, el/200, (dur - el)/500);
+  // viñeta rosa/roja
+  const gr = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.25, W/2, H/2, Math.max(W,H)*0.75);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(255,0,90,${(roseFx.garden ? 0.55 : 0.4)*a})`);
+  ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
+  // cartel central
+  const bw = Math.min(W*0.92, 640), cy = oy + rows*cell*0.5, s = Math.min(1, bw/640), pop = 1 + Math.max(0, 1 - el/250)*0.25;
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(W/2, cy); ctx.scale(pop, pop);
+  ctx.fillStyle = 'rgba(20,0,10,0.82)'; ctx.strokeStyle = `hsl(${340 + Math.sin(el/120)*12},100%,60%)`; ctx.lineWidth = 4;
+  ctx.shadowColor = '#ff2d6f'; ctx.shadowBlur = 30; rrect(ctx, -bw/2, -95*s, bw, 190*s, 22*s); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const line = (txt, y, fs, col) => { ctx.font = `900 ${fs*s}px "Segoe UI",system-ui,sans-serif`; ctx.lineWidth = fs*s*0.15; ctx.strokeStyle = 'rgba(0,0,0,.9)'; ctx.strokeText(txt, 0, y*s);
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.fillText(txt, 0, y*s); ctx.shadowBlur = 0; };
+  line(roseFx.garden ? '🥀 ¡JARDÍN MALDITO! 🥀' : '🌹 MALDICIÓN DE LA ROSA', -52, roseFx.garden ? 46 : 42, '#ff4d8a');
+  line(roseFx.who ? 'de ' + roseFx.who : '¡alguien mandó una rosa!', -6, 34, '#fff');
+  const sub = roseFx.garden ? '¡LA SERPIENTE VUELVE A EMPEZAR! 😱' : (roseFx.cut ? '-' + roseFx.cut + ' de cuerpo · ' : '') + 'COMBO x' + roseFx.lvl;
+  line(sub, 38, 28, '#ffd36b');
+  if (!roseFx.garden) line('🌹 ' + (ROSE_MAX - roseFx.lvl) + ' rosa' + (ROSE_MAX - roseFx.lvl === 1 ? '' : 's') + ' más seguidas = 🥀 JARDÍN MALDITO', 74, 20, '#ffb3c9');
+  ctx.restore();
+}
 // 🎰 Ruleta: elige un evento al azar (para likes / interacciones). Se encolan si llegan varias.
 const WHEEL = [ ['🍎 LLUVIA',25,() => rain()], ['⭐ MEGA ORBE',15,() => mega()], ['⚡ TURBO',15,() => turbo()], ['🐢 CÁMARA LENTA',10,() => slowmo()],
   ['🌑 APAGÓN',10,() => blackout()], ['🧱 OBSTÁCULO',10,() => obstacle()], ['🌋 TERREMOTO',8,() => quake()], ['✂️ TIJERAS',4,() => scissors()], ['☠️ VENENO',3,() => poison()] ];
@@ -736,7 +807,7 @@ window.addEventListener('keydown', e => {
     case 'KeyO': obstacle(); break;
     case 'KeyK': scissors(); break;
     case 'KeyU': roulette(); break;
-    case 'KeyV': poison(); break;
+    case 'KeyV': rose(); break;
     case 'KeyE': shield(); break;
     case 'KeyC': slowmo(); break;
     case 'KeyN': blackout(); break;
@@ -771,7 +842,7 @@ $('rainBtn').onclick = e => { initAudio(); rain(); e.currentTarget.blur(); };
 $('turboBtn').onclick = e => { initAudio(); turbo(); e.currentTarget.blur(); };
 $('megaBtn').onclick = e => { initAudio(); mega(); e.currentTarget.blur(); };
 $('obstBtn').onclick = e => { initAudio(); obstacle(); e.currentTarget.blur(); };
-[['wheelBtn',() => roulette()],['scisBtn',() => scissors()],['poisonBtn',() => poison()],['shieldBtn',() => shield()],['slowBtn',() => slowmo()],['darkBtn',() => blackout()],['quakeBtn',() => quake()]]
+[['wheelBtn',() => roulette()],['scisBtn',() => scissors()],['poisonBtn',() => rose()],['shieldBtn',() => shield()],['slowBtn',() => slowmo()],['darkBtn',() => blackout()],['quakeBtn',() => quake()]]
   .forEach(([id,fn]) => $(id).onclick = e => { initAudio(); fn(); e.currentTarget.blur(); });
 $('resetHiBtn').onclick = e => { hiHuman = 0; hiBot = 0; wins = 0; losses = 0; streak = 0; saveHi(); updateHud(); e.currentTarget.blur(); };
 
@@ -1118,6 +1189,7 @@ function render(){
     ctx.fillStyle = gr; ctx.fillRect(-50, -50, W+100, H+100);
   }
   drawWheel();
+  drawRose();
   // textos flotantes
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const f of floats){
@@ -1137,6 +1209,7 @@ function render(){
   if (now < turboUntil) info += '  ⚡TURBO ' + Math.ceil((turboUntil - now)/1000) + 's';
   if (now < slowUntil) info += '  🐢 ' + Math.ceil((slowUntil - now)/1000) + 's';
   if (shields) info += '  🛡️x' + shields;
+  if (roseCombo && now - roseLast < ROSE_WINDOW) info += '  🌹 COMBO x' + roseCombo + ' (' + Math.ceil((ROSE_WINDOW - (now - roseLast))/1000) + 's)';
   if (!bot && combo >= 2 && now - lastEat < 1500) info += '  COMBO x' + (combo+1);
   ctx.fillText(info, ox + 4, oy + 4);
   if (state === 'ready'){
@@ -1228,7 +1301,7 @@ requestAnimationFrame(frame);
 const SB_EVENTS = [
   ['ruleta', roulette], ['lluvia', rain], ['mega', mega], ['turbo', turbo],
   ['lent', slowmo], ['apagon', blackout], ['minado', () => obstacle()], ['bloque', () => obstacle()], ['obstaculo', () => obstacle()],
-  ['terremoto', quake], ['tijera', scissors], ['veneno', poison], ['escudo', shield]
+  ['terremoto', quake], ['tijera', scissors], ['veneno', () => rose()], ['rosa', () => rose()], ['maldicion', () => rose()], ['escudo', shield]
 ];
 const sbNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 /* Acción única "Snake Evento": TikFinity gratis solo deja 5 acciones, así que una sola acción
@@ -1244,8 +1317,8 @@ function sbSmart(a){
   const text = sbNorm(str('commandParams') + ' ' + str('comment') + ' ' + str('message') + ' ' + str('command') + ' ' + str('rawInput'));
   sbLast = Object.keys(a).filter(k => !/^(__|actionId|actionName|runningActionId|eventSource)/.test(k)).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · ');
   if (gift || type.includes('gift')){
-    const rose = /rose|rosa/.test(sbNorm(gift)) || str('giftId') === '5655' || str('coins') === '1';
-    if (rose){ const n = Math.min(3, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) setTimeout(poison, i*1200); chatEv('rose', a); }
+    const isRose = /rose|rosa/.test(sbNorm(gift)) || str('giftId') === '5655' || str('coins') === '1';
+    if (isRose){ const n = Math.min(10, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) rose(nick(a)); chatEv('rose', a); }
     else { roulette(); chatEv('gift', a); }
     return 'regalo';
   }
@@ -1318,7 +1391,7 @@ const LEGEND = [
   '❤️ 1000 LIKES → ✂️ TIJERAS (¡LA MITAD!)',
   '➕ SÍGUEME → 🌋 TERREMOTO',
   '🔁 COMPARTE → 🎁 ¡SORPRESA!',
-  '🌹 ROSA → ☠️ VENENO',
+  '🌹 ROSA → MALDICIÓN · 5 SEGUIDAS = 🥀 JARDÍN MALDITO',
   '💬 !snake turbo · lento · apagon · bloque · ruleta'
 ];
 let legI = 0;
@@ -1365,7 +1438,7 @@ function chatEv(kind, a){
   const M = {
     follow: [`🌋 ${who} siguió y provocó un TERREMOTO 😱`, `🌋 ¡Gracias ${who} por seguir! La serpiente tiembla…`],
     share:  [`⭐ ${who} compartió y soltó un MEGA ORBE 🙌`, `🔁 ¡Gracias ${who} por compartir!`],
-    rose:   [`☠️ ${who} envenenó a la serpiente con una 🌹 😈`, `🌹 ${who} mandó VENENO… pobre serpiente ☠️`],
+    rose:   [`🌹 ${who} lanzó la MALDICIÓN DE LA ROSA 😈 ¡5 rosas seguidas = 🥀 JARDÍN MALDITO!`, `🌹 ¡${who} maldijo a la serpiente! Combo de rosas: a la 5.ª vuelve a empezar 🥀`],
     gift:   [`🎁 ¡Gracias ${who} por el regalo! 🎰 Ruleta`],
     likes100:  [`🎰 ¡100 likes más! Gira la RULETA 🎰 Seguid dando ❤️`],
     likes300:  [`🍎 ¡300 likes! LLUVIA DE MANZANAS 🍎🍎🍎`],
@@ -1388,7 +1461,7 @@ function chatLoss(c, st){
 const CHAT_TIPS = [
   '❤️ Cada 100 likes giramos la RULETA 🎰 ¡Prueba tu suerte! · 300 = 🍎 lluvia · 1000 = ✂️ tijeras',
   '💬 Comenta !snake turbo, !snake lento, !snake apagon, !snake bloque o !snake ruleta ¡y cambia la partida! 🐍',
-  '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = ☠️ veneno · 🔁 Comparte = 🎁 sorpresa',
+  '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = maldición (5 seguidas = 🥀 jardín maldito) · 🔁 Comparte = 🎁 sorpresa',
   '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈'
 ];
 setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
@@ -1413,7 +1486,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>

@@ -38,7 +38,7 @@ Haz doble clic en **`Abrir Neon Snake.bat`**. Abre el juego en una ventana propi
 | **Q** | 🌋 Terremoto + 3 obstáculos |
 | **O** | 🧱 Campo minado: obstáculos en el 40 % de las casillas libres durante 5 s (4 % de probabilidad de que salga uno en la cara = game over) |
 | **K** | ✂️ Tijeras: pierde la mitad del cuerpo |
-| **V** | ☠️ Veneno: pierde el 15 % y se acelera 8 s |
+| **V** | 🌹 Maldición de la rosa: corta 30–60 % (combo), espinas y turbo; 5 rosas seguidas = 🥀 Jardín maldito (vuelve a 4 casillas) |
 | **E** | 🛡️ Escudo: salva de un error o un obstáculo (máx. 3) |
 | P / M / R / F | Pausa / sonido / reiniciar / pantalla completa |
 
@@ -64,7 +64,7 @@ En TikFinity → *Actions & Events*, crea una acción de **pulsar tecla** para c
 | 💬 `!ruleta` | 🎰 Ruleta | U |
 | 💬 `!turbo` / `!lento` | ⚡ / 🐢 | T / C |
 | 💬 `!apagon` / `!bloque` | 🌑 / 🧱 | N / O |
-| 🌹 Rosa | ☠️ Veneno | V |
+| 🌹 Rosa | 💀 Maldición de la rosa (combo; 5 seguidas = 🥀 Jardín maldito) | V |
 
 Pon una espera de unos 30 segundos a los comandos del chat para que no los spameen.
 
