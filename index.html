@@ -1181,10 +1181,10 @@ function addCommenter(n){
   if (foods.length && !foods.some(f => f.name)){ const f = foods.find(f => !f.mega); if (f) f.name = fruitName(); }
 }
 function fruitName(){
-  // reparto justo: nunca el mismo nombre en dos frutas a la vez, cada nombre descansa 40 s
-  // entre usos y siempre se elige entre los que menos veces han salido (al azar si empatan)
-  const t = Date.now(), onBoard = new Set(foods.map(f => f.name).filter(Boolean));
-  const live = commenters.filter(c => t - c.at < 6*60*1000 && !onBoard.has(c.n) && t - (c.last || 0) > 40000);
+  // reparto: cada nombre puede repetirse, pero con calma: 10 s entre usos y como mucho 2 frutas
+  // a la vez con el mismo nombre; primero los que menos han salido (al azar si empatan)
+  const t = Date.now(), cnt = {}; for (const f of foods) if (f.name) cnt[f.name] = (cnt[f.name] || 0) + 1;
+  const live = commenters.filter(c => t - c.at < 6*60*1000 && (cnt[c.n] || 0) < 2 && t - (c.last || 0) > 10000);
   if (!live.length) return '';
   const min = Math.min(...live.map(c => c.used)), pool = live.filter(c => c.used === min);
   const c = pool[(Math.random()*pool.length)|0]; c.used++; c.last = t; return c.n;
@@ -2437,7 +2437,7 @@ const SB_EVENTS = [
 const sbNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 /* Acción única "Snake Evento": TikFinity gratis solo deja 5 acciones, así que una sola acción
    sirve para todo y el juego decide qué hacer con los datos que le llegan. */
-let likeAcc = 0, sbLast = '';
+let likeAcc = 0, sbLast = ''; const followed = new Set();
 const LIKE_RULES = [[1000, scissors, '✂️'], [300, rain, '🍎'], [100, roulette, '🎰']];
 function sbSmart(a){
   a = a || {};
@@ -2475,7 +2475,14 @@ function sbSmart(a){
     if (/(como|que|donde).{0,12}(particip|jueg|hago|hacer|funcion|comando|interact)|ayuda|help|comandos|no entiendo/.test(text)) chatHelp(nick(a));
     return 'charla';                       // comentario normal: no hace nada
   }
-  if (type.includes('share') || type.includes('compart')){ mega(); chatEv('share', a); return 'compartir'; }
+  // sin texto: puede ser follow, compartir o alguien que solo entra al live. Se busca la pista en
+  // TODOS los datos que llegan; si no se sabe qué es, se toma como una entrada (saludo), nunca como follow.
+  const all = sbNorm(Object.keys(a).filter(k => !/nick|user|name|comment|message|picture|avatar|url|image|actionid|runningaction/i.test(k))
+    .map(k => k + '=' + str(k)).join(' '));
+  if (type.includes('share') || type.includes('compart') || /share|compart/.test(all)){ mega(); chatEv('share', a); return 'compartir'; }
+  if (/join|member|unio|enter|entr/.test(type + ' ' + all) || !/follow|segu/.test(type + ' ' + all)){ greet(nick(a)); return 'saludo'; }
+  // un follow por persona y directo (si alguien deja de seguir y vuelve, no repite el terremoto)
+  const who = nick(a); if (who !== 'Alguien'){ if (followed.has(who)) return 'follow repetido'; followed.add(who); }
   quake(); chatEv('follow', a); return 'follow';
 }
 function sbTrigger(name, who, args){
