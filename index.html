@@ -11,16 +11,18 @@
     user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
     font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:#fff}
   canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
-  #hud{position:fixed;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:22px;align-items:baseline;
-    pointer-events:none;font-weight:800;letter-spacing:3px;white-space:nowrap;z-index:5}
-  #hud .hi{font-size:18px;color:hsl(var(--h),100%,64%);text-shadow:0 0 6px hsl(var(--h),100%,55%),0 0 18px hsl(var(--h),100%,50%)}
-  #hud .hib{font-size:13px;color:hsl(var(--h2),100%,68%);opacity:.9;text-shadow:0 0 6px hsl(var(--h2),100%,55%)}
+  #hud{position:fixed;top:6px;left:50%;transform:translateX(-50%);display:flex;gap:20px;align-items:center;
+    pointer-events:none;font-weight:800;letter-spacing:2px;white-space:nowrap;z-index:5;
+    padding:5px 18px;border-radius:999px;background:rgba(0,0,0,.78);border:1px solid hsla(var(--h),100%,60%,.6);
+    box-shadow:0 0 16px hsla(var(--h),100%,50%,.4)}
+  #hud .hi{font-size:26px;color:hsl(var(--h),100%,64%);text-shadow:0 0 6px hsl(var(--h),100%,55%),0 0 18px hsl(var(--h),100%,50%)}
+  #hud .hib{font-size:19px;color:hsl(var(--h2),100%,72%);text-shadow:0 0 6px hsl(var(--h2),100%,55%)}
   #hud b{font-weight:900;display:inline-block}
   #hud #streakV{color:#ffb300;text-shadow:0 0 8px #ff6a00}
   .bump{animation:bump .5s ease-out}
   @keyframes bump{0%{transform:scale(1)}30%{transform:scale(1.5);filter:brightness(2)}100%{transform:scale(1)}}
-  #hud .sm{font-size:11px;opacity:.8}
-  @media (max-width:520px){#hud{top:46px;gap:10px;letter-spacing:1px}#hud .hi{font-size:15px}#hud .hib{font-size:11px}#hud .sm{display:none}#toast{display:none}}
+  #hud .sm{font-size:14px;opacity:.85}
+  @media (max-width:520px){#hud{top:44px;gap:10px;letter-spacing:1px;padding:4px 12px}#hud .hi{font-size:19px}#hud .hib{font-size:14px}#hud .sm{display:none}#toast{display:none}}
   .corner{position:fixed;top:8px;z-index:6;display:flex;gap:6px}
   #cornerR{right:8px} #cornerL{left:8px}
   .cbtn{background:rgba(0,0,0,.55);color:hsl(var(--h),100%,65%);border:1px solid hsla(var(--h),100%,60%,.4);border-radius:8px;
@@ -54,16 +56,17 @@
   @media (pointer:coarse){#pad{display:block}}
   #legend{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;
     padding:5px 16px;border-radius:999px;background:rgba(0,0,0,.72);border:1px solid hsla(var(--h),100%,60%,.55);
-    box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:15px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
+    box-shadow:0 0 14px hsla(var(--h),100%,50%,.35);font-weight:800;font-size:20px;letter-spacing:1px;color:#fff;white-space:nowrap;z-index:5;pointer-events:none;max-width:calc(100vw - 16px)}
   #legend.hidden{display:none}
   #legTxt{transition:opacity .35s;text-shadow:0 0 8px hsla(var(--h),100%,60%,.9)}
-  #legTot{color:#fff;font-size:14px;text-shadow:0 0 8px #ff2d6f}
+  #legTot{color:#fff;font-size:19px;text-shadow:0 0 8px #ff2d6f}
   #legNext{color:#ffd0de}
-  #legLikes{display:flex;align-items:center;gap:6px;font-size:12px;color:#ff7aa8;border-left:1px solid rgba(255,255,255,.2);padding-left:12px}
-  #legBar{width:70px;height:7px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
+  #legLikes{display:flex;align-items:center;gap:8px;font-size:16px;color:#ff7aa8;border-left:1px solid rgba(255,255,255,.2);padding-left:12px}
+  #legBar{width:90px;height:9px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
   #legFill{height:100%;width:0;background:linear-gradient(90deg,#ff2d6f,#ffb3c9);box-shadow:0 0 8px #ff2d6f;transition:width .4s}
-  @media (max-width:520px){#legend{font-size:11px;gap:2px 8px;padding:3px 10px;flex-wrap:wrap;justify-content:center;white-space:normal;text-align:center;border-radius:14px;width:calc(100vw - 16px)}#legLikes{border-left:0;padding-left:0}#legBar{width:60px}}
-  #toast{position:fixed;left:50%;top:44px;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:#888;
+  @media (max-width:520px){#legend{font-size:13px;gap:2px 8px;padding:3px 10px;flex-wrap:wrap;justify-content:center;white-space:normal;text-align:center;border-radius:14px;width:calc(100vw - 16px)}#legLikes{border-left:0;padding-left:0}#legBar{width:60px}}
+  @media (max-width:820px){#hud .sm{display:none}#hud{gap:14px;letter-spacing:1px}}
+  #toast{position:fixed;left:50%;top:62px;transform:translateX(-50%);font-size:11px;letter-spacing:2px;color:#888;
     pointer-events:none;z-index:5;transition:opacity 1s}
 </style>
 </head>
@@ -115,6 +118,7 @@
     <button id="loseSndClr">🚫 Quitar sonido</button>
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
     <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
+    <button id="widgetBtn">🪟 Abrir widget de datos</button>
     <button id="legendBtn">📋 Cartel espectadores (I)</button>
     <button id="resetHiBtn">🗑 Borrar marcador</button>
   </div>
@@ -169,7 +173,7 @@ function layout(){
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth; H = window.innerHeight;
   cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
-  const top = W <= 520 ? 68 : 42, pad = 6, bot = S.legend ? (W <= 520 ? 50 : 36) : pad, aw = W - pad*2, ah = H - top - bot;
+  const top = W <= 520 ? 84 : 58, pad = 6, bot = S.legend ? (W <= 520 ? 56 : 48) : pad, aw = W - pad*2, ah = H - top - bot;
   cell = Math.max(6, Math.floor(Math.min(aw, ah) / S.grid));
   let nc = Math.max(6, Math.floor(aw/cell)), nr = Math.max(6, Math.floor(ah/cell));
   if (nc % 2) nc--; if (nr % 2) nr--;   // pares: permite un ciclo con forma de laberinto
@@ -676,16 +680,26 @@ function obstacle(single){
     if (fx >= 0 && fy >= 0 && fx < cols && fy < rows && !occ[fy*cols + fx]){ front = fy*cols + fx; forceDir = d; queue = []; }
   }
   // zona protegida: el camino que hará en los próximos ~5,5 s y un radio de 2 alrededor de la cabeza
-  const clear = Math.ceil(curSps()*1.6*(OBST_MS/1000 + 0.6)) + 4;
-  const free = [];
-  for (let i=0;i<N;i++){
-    if (occ[i] || i === front) continue;
-    const x = i % cols, y = (i/cols)|0;
-    if (Math.abs(x - h.x) + Math.abs(y - h.y) <= 2) continue;
-    if (ham && bot && cyc(s0, i) <= clear) continue;
-    free.push(i);
-  }
+  const scan = cl => { const out = [];
+    for (let i=0;i<N;i++){
+      if (occ[i] || i === front) continue;
+      const x = i % cols, y = (i/cols)|0;
+      if (Math.abs(x - h.x) + Math.abs(y - h.y) <= 2) continue;
+      if (ham && bot && cyc(s0, i) <= cl) continue;
+      out.push(i);
+    }
+    return out; };
   let want = single ? 1 : Math.round((N - snake.length - foods.length - obstacles.length) * OBST_FIELD);
+  let free = scan(Math.ceil(curSps()*1.6*(OBST_MS/1000 + 0.6)) + 4);
+  // con la serpiente grande casi todo el tablero libre está "delante" en su recorrido: se reduce la zona
+  // protegida a ~2 s y TOP frena (curSps) para llegar cuando ya se han desvanecido. Así siempre se ven.
+  if (!single && free.length < want && ham && bot){
+    // al final casi todas las casillas libres son justo las que va a recorrer: se usan las más lejanas
+    // (deja libres las ~40 % más cercanas) y TOP avanza despacio, con tensión, hasta que se desvanecen
+    const all = scan(-1).sort((a, b) => cyc(s0, a) - cyc(s0, b));
+    free = all.slice(Math.max(8, Math.ceil(all.length*0.4)));
+    want = Math.min(want, free.length);
+  }
   for (let i=free.length-1;i>0;i--){ const j = (Math.random()*(i+1))|0; [free[i],free[j]] = [free[j],free[i]]; }
   if (single) free.sort((a,b) => cyc(s0,b) - cyc(s0,a)), free.length = Math.min(free.length, Math.max(1, Math.ceil(free.length/3))), free.sort(() => Math.random() - .5);
   const picks = free.slice(0, Math.min(want, free.length));
@@ -1360,26 +1374,43 @@ function chatEv(kind, a){
     cmd_apagon: [`🌑 ${who} apagó las luces…`], cmd_bloque: [`🧱 ${who} llenó el tablero de OBSTÁCULOS 😬`],
     cmd_ruleta: [`🎰 ${who} giró la RULETA`], cmd_lluvia: [`🍎 ${who} pidió LLUVIA`]
   };
-  if (M[kind]) chatSay(pick(M[kind]), kind.startsWith('likes') ? 2 : 1);
+  if (M[kind]){ const msg = pick(M[kind]); chatSay(msg, kind.startsWith('likes') ? 2 : 1); feedPush(msg); }
 }
 function chatWin(){
+  feedPush('🏆 ¡VICTORIA! Racha 🔥' + streak);
   chatSay(pick([`🏆 ¡TABLERO COMPLETO! La serpiente GANÓ 🐍🔥 Racha: ${streak}`, `🏆 ¡VICTORIA! ${wins} ganadas hoy. Racha 🔥${streak}`]), 3);
 }
 function chatLoss(c, st){
+  feedPush('💀 Murió al ' + (c ? c.pct : '?') + '%');
   const why = killedBy === 'wall' ? 'chocó contra la pared' : killedBy === 'body' ? 'se mordió' : killedBy.startsWith('obst') ? 'chocó con un obstáculo' : 'murió';
   chatSay(`💀 ¡${why.toUpperCase()} al ${c ? c.pct : '?'}%!` + (st >= 2 ? ` Se acabó la racha de ${st} 💔` : ' Nueva partida 🔄'), 3);
 }
 const CHAT_TIPS = [
-  '🐍 Dale ❤️: 100 likes = 🎰 ruleta, 300 = 🍎 lluvia, 1000 = ✂️ tijeras',
-  '➕ Sígueme para un 🌋 TERREMOTO · 🌹 Rosa = ☠️ veneno · 🔁 Comparte = sorpresa',
-  '💬 Escribe !snake turbo · !snake lento · !snake apagon · !snake bloque · !snake ruleta'
+  '❤️ Cada 100 likes giramos la RULETA 🎰 ¡Prueba tu suerte! · 300 = 🍎 lluvia · 1000 = ✂️ tijeras',
+  '💬 Comenta !snake turbo, !snake lento, !snake apagon, !snake bloque o !snake ruleta ¡y cambia la partida! 🐍',
+  '➕ Sígueme y suelta un 🌋 TERREMOTO · 🌹 Rosa = ☠️ veneno · 🔁 Comparte = 🎁 sorpresa',
+  '🐍 La serpiente juega sola y gana ~1 de cada 3. ¿La ayudas o la haces sufrir? 😈'
 ];
-setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 5*60*1000);
-setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 60*1000);
+setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
+setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 30*1000);
 setInterval(chatPump, 1000);
 function setChatBtn(){ $('chatBtn').textContent = '💬 Mensajes al chat: ' + (S.chat ? 'SÍ' : 'NO'); }
 $('chatBtn').onclick = e => { S.chat = !S.chat; if (!S.chat) chatQ.length = 0; saveSettings(); setChatBtn(); e.currentTarget.blur(); };
 setChatBtn();
+
+/* ---------- widget aparte (widget.html): el juego publica su estado en localStorage ---------- */
+const feed = [];
+function feedPush(t){ feed.unshift({ t, at: Date.now() }); if (feed.length > 6) feed.length = 6; }
+function publishLive(){
+  try {
+    localStorage.setItem('neonsnake_live', JSON.stringify({
+      at: Date.now(), likes: likeAcc, wins, losses, streak, hi: hiBot, pct: N ? Math.floor(100*snake.length/N) : 0,
+      state, sb: sbOk, feed
+    }));
+  } catch(e){}
+}
+setInterval(publishLive, 400);
+$('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
 window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },

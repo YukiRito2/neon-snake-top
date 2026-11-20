@@ -10,6 +10,10 @@ Haz doble clic en **`Abrir Neon Snake.bat`**. Abre el juego en una ventana propi
 
 > Ojo: TikFinity manda las teclas a la ventana que esté activa. Para que los eventos del público lleguen, la ventana del juego tiene que ser la activa (haz clic en ella antes de irte).
 
+## Widget de datos
+
+`Abrir Neon Snake.bat` abre también **`widget.html`**: una ventana con victorias, derrotas, racha, likes (cuánto falta para ruleta, lluvia y tijeras), qué hace cada interacción y los últimos eventos con el nombre de quien los lanzó. Captúrala como otra ventana en TikTok Live Studio. También se abre desde el panel (H) → *Abrir widget de datos*.
+
 ## Cómo funciona
 
 - **TOP (piloto automático):** va directo a la fruta. A partir del ~70 % del tablero recorre una ruta que cubre todas las casillas (con forma de laberinto distinta en cada partida), para poder llenarlo entero.
