@@ -1249,7 +1249,7 @@ function sbSmart(a){
 }
 function sbTrigger(name, who, args){
   const n = sbNorm(name);
-  if (!n.includes('snake')) return false;
+  if (!n.includes('snake') || n.includes('chat')) return false;   // "Snake Chat" es la salida al chat, no un evento
   const a = args || {};
   const hasData = ['giftName','giftId','likeCount','commandParams','comment','message','eventType','triggerType'].some(k => a[k] != null && String(a[k]).trim() !== '');
   if (n.includes('evento') || hasData){
