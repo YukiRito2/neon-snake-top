@@ -4,6 +4,12 @@ Snake neón para directos de TikTok. Se juega solo ("TOP"), llena el tablero com
 
 Todo el juego está en un solo archivo: **`index.html`**. Ábrelo en el navegador (Chrome o Edge) y listo. No necesita instalar nada ni conexión a internet.
 
+## Abrirlo para el directo
+
+Haz doble clic en **`Abrir Neon Snake.bat`**. Abre el juego en una ventana propia de Edge que **sigue jugando aunque la minimices o la tapes** con otra ventana. (Con doble clic en `index.html` también funciona, pero el navegador normal frena la animación cuando la ventana no se ve).
+
+> Ojo: TikFinity manda las teclas a la ventana que esté activa. Para que los eventos del público lleguen, la ventana del juego tiene que ser la activa (haz clic en ella antes de irte).
+
 ## Cómo funciona
 
 - **TOP (piloto automático):** va directo a la fruta. A partir del ~70 % del tablero recorre una ruta que cubre todas las casillas (con forma de laberinto distinta en cada partida), para poder llenarlo entero.

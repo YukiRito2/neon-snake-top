@@ -1138,12 +1138,17 @@ function bump(id){ const el = $(id); el.classList.remove('bump'); void el.offset
 let lastT = performance.now();
 function frame(t){
   requestAnimationFrame(frame);
-  const dt = Math.min(100, t - lastT); lastT = t; now = t;
+  logic(performance.now());
+  render();
+}
+/* lógica separada del dibujo: así sigue jugando aunque la ventana esté minimizada o tapada */
+function logic(t){
+  const dt = Math.min(document.hidden ? 1000 : 100, Math.max(0, t - lastT)); lastT = t; now = t;
   if (!paused){
     if (state === 'play'){
-      acc += dt; const iv = 1000/curSps(); let n = 0;
-      while (acc >= iv && n < 16 && state === 'play'){ acc -= iv; step(); n++; }
-      if (n >= 16) acc = 0;
+      acc += dt; const iv = 1000/curSps(); let n = 0; const cap = document.hidden ? 240 : 16;
+      while (acc >= iv && n < cap && state === 'play'){ acc -= iv; step(); n++; }
+      if (n >= cap) acc = 0;
     } else if (state === 'dead'){
       if (!deathBoom && now - deadAt >= 1900){
         deathBoom = true; shake = 18;
@@ -1164,8 +1169,18 @@ function frame(t){
     updateWheel();
     updateFx(dt);
   }
-  render();
 }
+// Reloj de fondo: el navegador congela requestAnimationFrame con la ventana minimizada,
+// así que un Worker (o setInterval) sigue moviendo el juego mientras está oculta.
+(function bgClock(){
+  const tick = () => { if (document.hidden) logic(performance.now()); };
+  try {
+    const src = 'setInterval(function(){ postMessage(0); }, 16);';
+    const w = new Worker(URL.createObjectURL(new Blob([src], {type:'text/javascript'})));
+    w.onmessage = tick;
+  } catch(e){ setInterval(tick, 16); }
+  setInterval(tick, 250);
+})();
 window.addEventListener('resize', layout);
 document.addEventListener('visibilitychange', saveHi);
 window.addEventListener('beforeunload', saveHi);
