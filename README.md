@@ -88,7 +88,7 @@ El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por p
 - **👋 Saludo:** acción de Streamer.bot *Snake Saludo* (evento *Join* de TikFinity). El bot da la bienvenida agrupando nombres cada 40 s.
 - **🐣 Mascota:** `mascota` → mini serpiente con tu nombre que sigue a la grande 20 s.
 - **💔 Última vida:** antes del error de TOP, el chat tiene 10 s para mandar 50 likes y salvarla (máx. 2 veces por partida). Sube un poco el % de victorias.
-- **📸 Repetición:** al morir o ganar se repiten los últimos 5 s a x0.6 (se puede apagar en el panel).
+- ~~📸 Repetición~~ (quitada a petición del streamer).
 - **🌗 Día y noche:** el fondo pasa de amanecer a noche según se llena el tablero (se puede apagar en el panel).
 - **Nuevo modo:** 🌊 Bajo el agua (burbujas, ondas, más lenta).
 - **🍎 Frutas con nombre:** las manzanas llevan el nombre de alguien que comentó hace poco; al comérsela sale "¡se comió a @…!".

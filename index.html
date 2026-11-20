@@ -164,7 +164,6 @@
     <button id="loseSndClr">↩️ Sonido original</button>
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
     <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
-    <button id="replayBtn">📸 Repetición: SÍ</button>
     <button id="dnBtn">🌗 Día y noche: SÍ</button>
     <button id="widgetBtn">🪟 Abrir widget de datos</button>
     <button id="legendBtn">📋 Cartel espectadores (I)</button>
@@ -1047,6 +1046,7 @@ function snap(){
   while (rec.length > 2 && now - rec[0].t > REC_MS) rec.shift();
 }
 function startReplay(kind){
+  return false;   // repetición desactivada a petición del streamer
   if (!S.replay || rec.length < 8) return false;
   replay = { start: now, t0: rec[0].t, t1: rec[rec.length-1].t, kind, crash: crashPt ? { ...crashPt } : null };
   replay.dur = (replay.t1 - replay.t0)/REPLAY_SPEED;
@@ -2118,8 +2118,7 @@ const CHAT_TIPS = [
 setInterval(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 3*60*1000);
 setTimeout(() => chatSay(CHAT_TIPS[chatTipI++ % CHAT_TIPS.length], 0), 30*1000);
 setInterval(chatPump, 1000);
-function setFxBtns(){ $('replayBtn').textContent = '📸 Repetición: ' + (S.replay ? 'SÍ' : 'NO'); $('dnBtn').textContent = '🌗 Día y noche: ' + (S.daynight ? 'SÍ' : 'NO'); }
-$('replayBtn').onclick = e => { S.replay = !S.replay; saveSettings(); setFxBtns(); e.currentTarget.blur(); };
+function setFxBtns(){ $('dnBtn').textContent = '🌗 Día y noche: ' + (S.daynight ? 'SÍ' : 'NO'); }
 $('dnBtn').onclick = e => { S.daynight = !S.daynight; saveSettings(); setFxBtns(); e.currentTarget.blur(); };
 setFxBtns();
 function setChatBtn(){ $('chatBtn').textContent = '💬 Mensajes al chat: ' + (S.chat ? 'SÍ' : 'NO'); }
