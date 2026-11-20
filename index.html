@@ -1181,10 +1181,13 @@ function addCommenter(n){
   if (foods.length && !foods.some(f => f.name)){ const f = foods.find(f => !f.mega); if (f) f.name = fruitName(); }
 }
 function fruitName(){
-  const live = commenters.filter(c => Date.now() - c.at < 10*60*1000);
+  // reparto justo: nunca el mismo nombre en dos frutas a la vez, cada nombre descansa 40 s
+  // entre usos y siempre se elige entre los que menos veces han salido (al azar si empatan)
+  const t = Date.now(), onBoard = new Set(foods.map(f => f.name).filter(Boolean));
+  const live = commenters.filter(c => t - c.at < 6*60*1000 && !onBoard.has(c.n) && t - (c.last || 0) > 40000);
   if (!live.length) return '';
-  live.sort((a, b) => a.used - b.used || b.at - a.at);
-  const c = live[0]; c.used++; return c.n;
+  const min = Math.min(...live.map(c => c.used)), pool = live.filter(c => c.used === min);
+  const c = pool[(Math.random()*pool.length)|0]; c.used++; c.last = t; return c.n;
 }
 function ateName(n, x, y){
   addFloat(x, y - cell*1.2, '😋 ¡se comió a ' + n + '!', 30, Math.min(22, W/20));
