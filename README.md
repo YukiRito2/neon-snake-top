@@ -38,7 +38,15 @@ Haz doble clic en **`Abrir Neon Snake.bat`**. Abre el juego en una ventana propi
 | **E** | 🛡️ Escudo: salva de un error o un obstáculo (máx. 3) |
 | P / M / R / F | Pausa / sonido / reiniciar / pantalla completa |
 
-## TikFinity
+## TikFinity + Streamer.bot (recomendado, sin teclas)
+
+El juego se conecta solo al servidor WebSocket de Streamer.bot (`ws://127.0.0.1:8080/`). Así los eventos llegan aunque el juego no sea la ventana activa.
+
+1. En Streamer.bot crea acciones vacías llamadas **Snake Ruleta, Snake Lluvia, Snake Mega, Snake Turbo, Snake Lenta, Snake Apagon, Snake Bloque, Snake Terremoto, Snake Tijeras, Snake Veneno** (y si quieres *Snake Escudo*), y activa *Servers/Clients → WebSocket Server* con autoarranque.
+2. En TikFinity: *Setup → Streamer.bot Connection → Test Connection*. Luego crea acciones de tipo **Streamer.bot Action** con cada *Snake…* y asígnalas a los eventos de la tabla de abajo.
+3. En el panel del juego (H) verás "Streamer.bot: conectado ✔".
+
+## TikFinity solo con teclas (alternativa)
 
 En TikFinity → *Actions & Events*, crea una acción de **pulsar tecla** para cada disparador. La ventana del juego tiene que estar activa en el PC.
 

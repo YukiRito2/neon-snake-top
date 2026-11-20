@@ -105,6 +105,7 @@
     <input type="file" id="loseFile" accept="audio/*" style="display:none">
     <button id="resetHiBtn">🗑 Borrar marcador</button>
   </div>
+  <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
   <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>O: obstáculo · U: ruleta · K: tijeras · V: veneno · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P: pausa · M: sonido · R: reiniciar · F: pantalla completa</div>
 </div>
 
@@ -1189,9 +1190,58 @@ layout(); updateHud();
 $('pad').style.visibility = bot ? 'hidden' : '';
 requestAnimationFrame(frame);
 
+/* ---------- conexión directa con Streamer.bot (eventos de TikFinity sin teclas) ----------
+   TikFinity ejecuta una acción de Streamer.bot llamada "Snake <evento>" (p. ej. "Snake Veneno")
+   y este juego la recibe por el WebSocket de Streamer.bot (ws://127.0.0.1:8080/ por defecto). */
+const SB_EVENTS = [
+  ['ruleta', roulette], ['lluvia', rain], ['mega', mega], ['turbo', turbo],
+  ['lent', slowmo], ['apagon', blackout], ['minado', () => obstacle()], ['bloque', () => obstacle()], ['obstaculo', () => obstacle()],
+  ['terremoto', quake], ['tijera', scissors], ['veneno', poison], ['escudo', shield]
+];
+const sbNorm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function sbTrigger(name, who){
+  const n = sbNorm(name);
+  if (!n.includes('snake')) return false;
+  const hit = SB_EVENTS.find(([k]) => n.includes(k));
+  if (!hit) return false;
+  initAudio(); hit[1]();
+  if (who) addFloat(W/2, H*0.4 + Math.min(44, W/10), '@' + String(who).slice(0, 24), 300, Math.min(22, W/18));
+  return true;
+}
+let sbOk = false;
+function sbStatus(t, ok){ const el = $('sbStat'); if (el){ el.textContent = 'Streamer.bot: ' + t; el.style.color = ok ? '#4f8' : ''; } }
+function sbFindName(o, depth){
+  if (!o || typeof o !== 'object' || depth > 4) return null;
+  for (const k of ['name','actionName','action','snake']) if (typeof o[k] === 'string' && sbNorm(o[k]).includes('snake')) return o[k];
+  for (const k in o){ const r = sbFindName(o[k], depth + 1); if (r) return r; }
+  return null;
+}
+function sbWho(o){
+  const a = (o && (o.arguments || o.args)) || {}, u = (o && o.user) || {};
+  return a.nickname || a.username || a.userName || a.user || u.display || u.name || '';
+}
+(function sbConnect(){
+  const url = new URLSearchParams(location.search).get('sb') || 'ws://127.0.0.1:8080/';
+  let ws;
+  try { ws = new WebSocket(url); } catch(e){ sbStatus('no disponible', false); return; }
+  ws.onopen = () => {
+    sbOk = true; sbStatus('conectado ✔', true);
+    ws.send(JSON.stringify({ request:'Subscribe', id:'neonsnake', events:{ Raw:['Action'] } }));
+  };
+  ws.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+    if (!m || m.request === 'Hello' || m.id === 'neonsnake') return;
+    const d = m.data || m.args || m;
+    const name = sbFindName(d, 0);
+    if (name) sbTrigger(name, sbWho(d));
+  };
+  ws.onclose = () => { if (sbOk) sbStatus('desconectado, reintentando…', false); else sbStatus('abre Streamer.bot (reintentando…)', false); sbOk = false; setTimeout(sbConnect, 5000); };
+  ws.onerror = () => {};
+})();
+
 // API mínima para pruebas / automatización
 window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
-  get length(){ return snake.length; }, get cells(){ return N; } };
+  sbTrigger, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
 </body>
