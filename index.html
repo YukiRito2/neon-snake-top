@@ -258,7 +258,7 @@ function reset(){
   for (let i=0;i<4;i++){ const c = hamCell[(k0 - i + N) % N]; snake.push({ x:c % cols, y:(c/cols)|0 }); }
   dir = { x: snake[0].x - snake[1].x, y: snake[0].y - snake[1].y };
   obstacles = []; forceDir = null; killedBy = ''; shields = 0; foods = []; grow = 0; score = 0; eaten = 0; combo = 0; hunger = 0; acc = 0; rainLeft = 0;
-  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null;
+  botUsed = bot; rollFate(); startMod(); life = null; lifeUses = 0; pets = []; rec = []; replay = null; boss = null; bossDone = false; shots = [];
   queue = queue.filter(d => !(d.x === -dir.x && d.y === -dir.y)).slice(0,1);
   spawnFood();
   state = (bot || queue.length) ? 'play' : 'ready';
@@ -291,7 +291,7 @@ function spawnFood(type){
   }
   const mega = type === 'mega';
   const hues = [330, 0, 290, 25, 140, 200];
-  foods.push({ x:c%cols, y:(c/cols)|0, v:mega?5:1, mega, born:now, hue: mega ? 50 : hues[(Math.random()*hues.length)|0] });
+  foods.push({ x:c%cols, y:(c/cols)|0, v:mega?5:1, mega, born:now, hue: mega ? 50 : hues[(Math.random()*hues.length)|0], name: foods.length < 3 ? fruitName() : '' });
   return true;
 }
 function curSps(){
@@ -322,7 +322,7 @@ function step(){
   if (nx < 0 || ny < 0 || nx >= cols || ny >= rows){ killedBy = 'wall'; return die(nx, ny); }
   for (let i=0;i<obstacles.length;i++){
     const o = obstacles[i];
-    if (o.c !== ny*cols + nx) continue;
+    if (o.c !== ny*cols + nx || !obstLive(o)) continue;
     if (shields > 0){ obstacles.splice(i,1); burst(ox+(nx+.5)*cell, oy+(ny+.5)*cell, 0, 40, 6); useShield('¡OBSTÁCULO DESTRUIDO!'); break; }
     killedBy = o.front ? 'obst' : 'obst2'; o.hit = true; return die(nx, ny);
   }
@@ -355,6 +355,7 @@ function eat(fi){
   shake = Math.max(shake, f.mega ? 14 : (bot ? 3 : 6));
   pulse = Math.min(1, pulse + (f.mega ? 1 : 0.45)); scoreBump = 1;
   sEat(combo, f.mega);
+  if (f.name) ateName(f.name, px, py);
   if (f.mega) addFloat(px, py, '+5 MEGA', 50, 24);
   else if (combo >= 2 && !bot) addFloat(px, py, 'COMBO x'+(combo+1), (f.hue+40)%360, 15 + Math.min(combo,14));
   else addFloat(px, py, '+1', f.hue, 13);
@@ -487,6 +488,8 @@ function buildHam(){
     for (let x=cols-1;x>=0;x--) put(x, 0);
   }
 }
+// un obstáculo solo es peligroso desde que aparece hasta 1 s antes de desvanecerse del todo
+const obstLive = o => o.front || o.hit || (now - o.born >= 0 && now - o.born < OBST_MS - 1000);
 const cyc = (a, b) => (ham[b] - ham[a] + N) % N; // distancia hacia delante en el ciclo
 
 /* Piloto TOP:
@@ -502,7 +505,7 @@ function botMove(){
   if (doom) return mistakeMove(body);
 
   cur.fill(0); for (let i=0;i<L;i++) cur[body[i]] = L - i + grow;
-  for (const o of obstacles) cur[o.c] = 1e9;
+  for (const o of obstacles) if (obstLive(o)) cur[o.c] = 1e9;
   // fruta más cercana siguiendo el ciclo
   let fd = N, tf = null;
   for (const f of foods){ const d = cyc(s, f.y*cols + f.x); if (d < fd){ fd = d; tf = f; } }
@@ -514,7 +517,7 @@ function botMove(){
   if (fd < avail) avail = fd;
   if (avail < 0) avail = 0;
 
-  let oD = N; for (const o of obstacles){ const d = cyc(s, o.c); if (d < oD) oD = d; }
+  let oD = N; for (const o of obstacles){ if (!obstLive(o)) continue; const d = cyc(s, o.c); if (d < oD) oD = d; }
   const cx = s % cols, cy = (s - cx)/cols;
   // entre los movimientos seguros, el que más acerca a la fruta en línea recta (parece natural)
   let best = -1, bestD = 0, bestM = 1e9;
@@ -553,7 +556,7 @@ const DLIST = [DIRS.r, DIRS.l, DIRS.d, DIRS.u];
 function evalMoves(body){
   const L = body.length, s = body[0];
   cur.fill(0); for (let i=0;i<L;i++) cur[body[i]] = L - i + grow;
-  for (const o of obstacles) cur[o.c] = 1e9;
+  for (const o of obstacles) if (obstLive(o)) cur[o.c] = 1e9;
   const cx = s % cols, cy = (s - cx)/cols, out = [];
   for (let k=0;k<4;k++){
     const nx = cx + DX[k], ny = cy + DY[k];
@@ -1005,6 +1008,7 @@ function lifeLikes(n){
   }
 }
 function lifeTick(){
+  if (life && now < life.start) life.start = now;
   if (life && now - life.start >= LIFE_MS){
     life = null; slowUntil = 0; doom = true; doomSteps = 0;
     addFloat(W/2, H*0.42, '💔 No llegaron…', 0, Math.min(36, W/12));
@@ -1013,7 +1017,7 @@ function lifeTick(){
 function drawLife(){
   if (!life) return;
   const el = now - life.start, left = Math.max(0, LIFE_MS - el), k = Math.min(1, life.likes/LIFE_LIKES);
-  const bw = Math.min(W*0.85, 560), s = Math.min(1, bw/560), x = W/2 - bw/2, y = oy + rows*cell*0.12;
+  const bw = Math.min(W*0.85, 560), s = Math.min(1, bw/560), x = W/2 - bw/2, y = oy + rows*cell*(boss ? 0.36 : 0.12);
   const beat = 1 + Math.max(0, Math.sin(now*0.012))*0.05;
   ctx.save(); ctx.translate(W/2, y + 60*s); ctx.scale(beat, beat); ctx.translate(-W/2, -(y + 60*s));
   ctx.fillStyle = 'rgba(30,0,10,0.85)'; ctx.strokeStyle = '#ff2d55'; ctx.lineWidth = 3; ctx.shadowColor = '#ff2d55'; ctx.shadowBlur = 24;
@@ -1088,6 +1092,108 @@ function drawDayNight(){
   const og = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
   og.addColorStop(0, `rgba(${c},0.22)`); og.addColorStop(1, `rgba(${c},0)`);
   ctx.fillStyle = og; ctx.fillRect(sx - r, sy - r, r*2, r*2);
+}
+
+/* ---------- 🍎 frutas con nombre: cada manzana lleva el nombre de alguien que comentó ---------- */
+let commenters = [], ateLast = -1e9;   // { n, at, used }
+function addCommenter(n){
+  if (!n || n === 'Alguien') return;
+  const c = commenters.find(x => x.n === n);
+  if (c) c.at = Date.now(); else { commenters.push({ n, at: Date.now(), used: 0 }); if (commenters.length > 40) commenters.shift(); }
+  // si no hay ninguna fruta con nombre, se lo pone a una ya
+  if (foods.length && !foods.some(f => f.name)){ const f = foods.find(f => !f.mega); if (f) f.name = fruitName(); }
+}
+function fruitName(){
+  const live = commenters.filter(c => Date.now() - c.at < 10*60*1000);
+  if (!live.length) return '';
+  live.sort((a, b) => a.used - b.used || b.at - a.at);
+  const c = live[0]; c.used++; return c.n;
+}
+function ateName(n, x, y){
+  addFloat(x, y - cell*1.2, '😋 ¡se comió a ' + n + '!', 30, Math.min(22, W/20));
+  tone(300, .12, 'square', .07, 600);
+  if (Date.now() - ateLast > 60000){ ateLast = Date.now(); try { chatSay(`😋 ¡La serpiente se comió a ${n}! Comenta y tu nombre saldrá en una manzana 🍎`, 0); feedPush('😋 Se comió a ' + n); } catch(e){} }
+}
+
+/* ---------- 👑 corona del donante: el último que mandó rosa va encima de la serpiente ---------- */
+let crown = store.get('crown', '') || '';
+function setCrown(n){
+  if (!n || n === 'Alguien') return;
+  const changed = crown && crown !== n; crown = n; store.set('crown', n);
+  if (changed) addFloat(W/2, H*0.32, '👑 ' + n + ' le quitó la corona', 45, Math.min(26, W/16));
+}
+function drawCrown(){
+  if (!crown || !snake.length || state === 'dead') return;
+  const h = snake[0], x = ox + (h.x+.5)*cell, y = oy + h.y*cell - cell*0.15 + Math.sin(now*0.006)*cell*0.08;
+  const fs = Math.max(16, cell*0.9);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.font = `${fs}px "Segoe UI Emoji","Apple Color Emoji",sans-serif`; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 14; ctx.fillText('👑', x, y); ctx.shadowBlur = 0;
+  const ns = Math.max(11, Math.min(16, cell*0.5)); ctx.font = `900 ${ns}px "Segoe UI",system-ui,sans-serif`;
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.9)'; ctx.strokeText(crown, x, y - fs*0.95); ctx.fillStyle = '#ffd36b'; ctx.fillText(crown, x, y - fs*0.95);
+}
+
+/* ---------- ⚔️ JEFE FINAL: al 90 % aparece y lanza obstáculos hasta que la partida termina ---------- */
+let boss = null, bossDone = false, shots = [];
+function bossTick(dt){
+  if (state !== 'play'){ if (boss && state !== 'replay'){ boss.leaving = boss.leaving || now; } return; }
+  if (!boss && !bossDone && N && snake.length >= N*0.9){
+    bossDone = true; boss = { born: now, next: now + 2500, hits: 0, leaving: 0 };
+    shake = Math.max(shake, 22); flash = Math.max(flash, 0.8); pulse = 1;
+    addFloat(W/2, H*0.36, '⚔️ ¡JEFE FINAL!', 0, Math.min(52, W/9));
+    tone(55, 1.6, 'sawtooth', .3, 30); tone(82, 1.4, 'square', .12, 41, .1);
+    try { chatSay('⚔️ ¡APARECIÓ EL JEFE FINAL! La serpiente está al 90 %… ¿lo aguantará? 😱', 2); feedPush('⚔️ ¡Jefe final!'); } catch(e){}
+  }
+  if (boss && !boss.leaving && now >= boss.next){
+    boss.next = now + 2600 + Math.random()*1200;
+    bossShoot();
+  }
+}
+function bossShoot(){
+  // dispara a una casilla libre lejana en el recorrido de TOP (TOP frena y llega cuando ya se desvaneció)
+  const occ = new Uint8Array(N); for (const q of snake) occ[q.y*cols + q.x] = 1; for (const f of foods) occ[f.y*cols + f.x] = 1; for (const o of obstacles) occ[o.c] = 1;
+  const h = snake[0], s0 = h.y*cols + h.x, free = [];
+  for (let i=0;i<N;i++){ if (occ[i]) continue; const x = i % cols, y = (i/cols)|0; if (Math.abs(x - h.x) + Math.abs(y - h.y) <= 3 || (ham && bot && cyc(s0, i) < 8)) continue; free.push(i); }
+  if (free.length > 3){
+    const dist = i => (ham && bot) ? cyc(s0, i) : Math.abs(i % cols - h.x) + Math.abs(((i/cols)|0) - h.y);
+    free.sort((a, b) => dist(b) - dist(a));
+    const c = free[(Math.random()*Math.max(1, Math.floor(free.length*0.5)))|0];
+    obstacles.push({ c, born: now + 450, front: false });     // aparece cuando llega el proyectil
+    shots.push({ c, start: now }); tone(180, .3, 'sawtooth', .1, 70);
+  }
+
+}
+function bossPos(){ return { x: ox + cols*cell/2 + Math.sin(now*0.0011)*cols*cell*0.3, y: oy + cell*2.8 + Math.sin(now*0.003)*cell*0.3 }; }
+function drawBoss(){
+  if (!boss) return;
+  const el = now - boss.born, lv = boss.leaving ? now - boss.leaving : 0;
+  if (boss.leaving && lv > 900){ boss = null; shots = []; return; }
+  const a = Math.min(1, el/600) * (boss.leaving ? Math.max(0, 1 - lv/900) : 1), p = bossPos(), R = Math.max(18, cell*1.4)*(1 + 0.05*Math.sin(now*0.01));
+  ctx.save(); ctx.globalAlpha = a;
+  // aura
+  const g = ctx.createRadialGradient(p.x, p.y, R*0.3, p.x, p.y, R*2.6); g.addColorStop(0, 'rgba(255,0,40,0.45)'); g.addColorStop(1, 'rgba(255,0,40,0)');
+  ctx.fillStyle = g; ctx.fillRect(p.x - R*3, p.y - R*3, R*6, R*6);
+  // cuernos
+  ctx.fillStyle = '#2a0008'; ctx.strokeStyle = '#ff2240'; ctx.lineWidth = 2;
+  for (const sg of [-1, 1]){ ctx.beginPath(); ctx.moveTo(p.x + sg*R*0.55, p.y - R*0.6); ctx.quadraticCurveTo(p.x + sg*R*1.3, p.y - R*1.3, p.x + sg*R*1.1, p.y - R*1.75); ctx.lineTo(p.x + sg*R*0.25, p.y - R*0.85); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  // cuerpo
+  ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 30; ctx.fillStyle = '#1a0006'; ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, 6.28); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+  // ojo que mira a la cabeza de la serpiente
+  const h = snake[0]; let dx = 0, dy = 0; if (h){ const hx = ox + (h.x+.5)*cell - p.x, hy = oy + (h.y+.5)*cell - p.y, d = Math.hypot(hx, hy) || 1; dx = hx/d*R*0.22; dy = hy/d*R*0.22; }
+  ctx.fillStyle = '#ffe0e0'; ctx.beginPath(); ctx.ellipse(p.x, p.y, R*0.55, R*0.42, 0, 0, 6.28); ctx.fill();
+  ctx.fillStyle = '#ff1030'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 16; ctx.beginPath(); ctx.arc(p.x + dx, p.y + dy, R*0.24, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(p.x + dx, p.y + dy, R*0.07, R*0.2, 0, 0, 6.28); ctx.fill();
+  // etiqueta
+  ctx.font = `900 ${Math.max(11, R*0.42)}px "Segoe UI",system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText('⚔️ JEFE FINAL', p.x, p.y + R + 4); ctx.fillStyle = '#ff4d6d'; ctx.fillText('⚔️ JEFE FINAL', p.x, p.y + R + 4);
+  ctx.restore();
+  // proyectiles
+  for (let i=shots.length-1;i>=0;i--){
+    const sh = shots[i], k = (now - sh.start)/450;
+    const tx = ox + (sh.c % cols + .5)*cell, ty = oy + (((sh.c/cols)|0) + .5)*cell;
+    if (k >= 1){ burst(tx, ty, 350, 18, 4); ring(tx, ty, 350, cell*2, 3); shots.splice(i,1); continue; }
+    const x = p.x + (tx - p.x)*k, y = p.y + (ty - p.y)*k - Math.sin(k*Math.PI)*cell*3;
+    ctx.fillStyle = '#ff3355'; ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 18; ctx.beginPath(); ctx.arc(x, y, Math.max(3, cell*0.22), 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+  }
 }
 
 // 🌹 MALDICIÓN DE LA ROSA (el regalo de pago): mucho más dura que el veneno y con COMBO.
@@ -1542,6 +1648,11 @@ function renderMain(){
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath(); ctx.arc(x, y, r*0.38, 0, Math.PI*2); ctx.fill();
+    if (f.name && age >= 1){
+      const fs = Math.max(10, Math.min(14, cell*0.42)); ctx.font = `800 ${fs}px "Segoe UI",system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      const ty = f.y === 0 ? y + r + fs + 2 : y - r - 3;
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(f.name, x, ty); ctx.fillStyle = `hsl(${f.hue},100%,82%)`; ctx.fillText(f.name, x, ty);
+    }
     if (f.mega){
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       for (let a=0;a<3;a++){ const st = t*4 + a*2.094; ctx.beginPath(); ctx.arc(x, y, r*1.6, st, st + 1.2); ctx.stroke(); }
@@ -1690,6 +1801,8 @@ function renderMain(){
   pixelate();
   drawModFx(t);
   drawWheel();
+  drawBoss();
+  drawCrown();
   drawPets();
   drawModUi();
   drawLife();
@@ -1775,7 +1888,7 @@ function logic(t){
     }
     for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS && !obstacles[i].hit) obstacles.splice(i,1);
     if (now < quakeUntil){ shake = Math.max(shake, 16); quakeT -= dt; if (quakeT <= 0){ quakeT = 120; burst(ox + Math.random()*cols*cell, oy + Math.random()*rows*cell, 20 + Math.random()*30, 12, 4); } }
-    updateWheel(); modTick(dt); callTick(); lifeTick();
+    updateWheel(); modTick(dt); callTick(); lifeTick(); bossTick(dt);
     updateFx(dt);
   }
 }
@@ -1821,7 +1934,7 @@ function sbSmart(a){
   sbLast = Object.keys(a).filter(k => !/^(__|actionId|actionName|runningActionId|eventSource)/.test(k)).slice(0, 14).map(k => k + '=' + String(a[k]).slice(0, 18)).join(' · ');
   if (gift || type.includes('gift')){
     const isRose = /rose|rosa/.test(sbNorm(gift)) || str('giftId') === '5655' || str('coins') === '1';
-    if (isRose){ const n = Math.min(10, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) rose(nick(a)); chatEv('rose', a); }
+    if (isRose){ const n = Math.min(10, Math.max(1, parseInt(str('repeatCount'), 10) || 1)); for (let i=0;i<n;i++) rose(nick(a)); setCrown(nick(a)); chatEv('rose', a); }
     else { roulette(); chatEv('gift', a); }
     return 'regalo';
   }
@@ -1834,6 +1947,7 @@ function sbSmart(a){
   if (type.includes('join') || type.includes('member') || type.includes('unio')){ greet(nick(a)); return 'saludo'; }
   // Comandos intuitivos: vale "!snake turbo" o simplemente escribir "turbo" en el chat (si en TikFinity
   // el evento es "cualquier comentario"). Un mensaje que sea solo 1, 2 o 3 es un voto.
+  if (text.trim()) addCommenter(nick(a));
   const toks = [...new Set(text.replace(/!\s*snake/g, ' ').replace(/[^a-z0-9ñ ]/g, ' ').split(/\s+/).filter(Boolean))];
   if (toks.length === 1 && /^[123]$/.test(toks[0]) && castVote(+toks[0], nick(a))) return 'voto ' + toks[0];
   if (toks.length && toks.length <= 5){
@@ -2008,7 +2122,7 @@ setInterval(publishLive, 400);
 $('widgetBtn').onclick = e => { try { window.open('widget.html', 'neonsnake_widget', 'width=400,height=700'); } catch(err){} e.currentTarget.blur(); };
 
 // API mínima para pruebas / automatización
-window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
+window.NeonSnake = { step, reset, toggleBot, rain, turbo, get sps(){ return curSps(); }, _advance(ms){ now += ms; for (let i=obstacles.length-1;i>=0;i--) if (now - obstacles[i].born > OBST_MS) obstacles.splice(i,1); }, scissors, shield, poison, rose, castVote, startMod, get mod(){ return mod && mod.id; }, get votes(){ return voteCounts(); }, get voteOpts(){ return voteOpts.map(m => m.id); }, pet, greet, lifeLikes, get replay(){ return replay; }, setCrown, addCommenter, get boss(){ return boss; }, _bossShot(){ bossShoot(); }, get _obs(){ const s0 = snake[0] ? snake[0].y*cols + snake[0].x : 0; return obstacles.map(o => ({ age: Math.round(now - o.born), d: ham ? cyc(s0, o.c) : -1, hit: !!o.hit })); }, get crown(){ return crown; }, get recLen(){ return rec.length; }, startLife, _die(){ if (state === 'play') die(); }, get life(){ return life; }, get pets(){ return pets.length; }, sbSmart, callNow(){ callNext = 0; }, get roseCombo(){ return roseCombo; }, quake, get state(){ return state; }, obstacle, get obstacles(){ return obstacles.length; }, get killedBy(){ return killedBy; }, get fate(){ return fate; }, get doom(){ return doom; }, get wins(){ return wins; }, get losses(){ return losses; }, get score(){ return score; },
   sbTrigger, chatSay, get chatQ(){ return chatQ.slice(); }, get length(){ return snake.length; }, get cells(){ return N; } };
 })();
 </script>
