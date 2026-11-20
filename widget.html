@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEON SNAKE · WIDGET</title>
+<style>
+  :root{--h:190;--h2:300}
+  html,body{margin:0;height:100%;background:#000;color:#fff;overflow:hidden;
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;font-weight:800}
+  body{display:flex;flex-direction:column;gap:12px;padding:14px;box-sizing:border-box}
+  .card{border:2px solid hsla(var(--h),100%,60%,.75);border-radius:18px;padding:12px 14px;
+    background:linear-gradient(160deg,hsla(var(--h),100%,50%,.14),hsla(var(--h2),100%,50%,.10));
+    box-shadow:0 0 18px hsla(var(--h),100%,50%,.35),inset 0 0 18px hsla(var(--h),100%,50%,.12)}
+  h1{margin:0;font-size:26px;letter-spacing:2px;text-align:center;color:hsl(var(--h),100%,70%);
+    text-shadow:0 0 10px hsl(var(--h),100%,55%),0 0 24px hsl(var(--h),100%,50%)}
+  .sub{text-align:center;font-size:14px;letter-spacing:3px;color:hsl(var(--h2),100%,78%);margin-top:2px}
+  .score{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+  .score b{display:block;font-size:34px;line-height:1.1}
+  .score span{font-size:12px;letter-spacing:2px;opacity:.85}
+  .w b{color:#4dff88;text-shadow:0 0 10px #00ff66}.l b{color:#ff5470;text-shadow:0 0 10px #ff1744}.s b{color:#ffb300;text-shadow:0 0 10px #ff6a00}
+  .rules{display:flex;flex-direction:column;gap:7px;font-size:19px}
+  .rule{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .rule .k{color:#ffd0de}.rule .v{color:hsl(var(--h),100%,75%);text-align:right}
+  .cmd{font-size:15px;color:#ffe08a;text-align:center;line-height:1.35}
+  .bar{margin:6px 0}
+  .bar .t{display:flex;justify-content:space-between;font-size:15px;margin-bottom:3px}
+  .bar .t i{font-style:normal;color:#ffd0de}
+  .track{height:12px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden}
+  .fill{height:100%;width:0;border-radius:9px;transition:width .4s}
+  .f1 .fill{background:linear-gradient(90deg,#ff2d6f,#ffb3c9);box-shadow:0 0 10px #ff2d6f}
+  .f2 .fill{background:linear-gradient(90deg,#ff7a00,#ffd36b);box-shadow:0 0 10px #ff7a00}
+  .f3 .fill{background:linear-gradient(90deg,#a100ff,#e2a8ff);box-shadow:0 0 10px #a100ff}
+  .tot{text-align:center;font-size:22px}.tot b{font-size:30px;color:#ff7aa8;text-shadow:0 0 10px #ff2d6f}
+  .feed{font-size:15px;display:flex;flex-direction:column;gap:5px;min-height:40px}
+  .feed div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:in .5s ease-out}
+  .feed div:first-child{color:#fff;font-size:17px}.feed div:not(:first-child){opacity:.6}
+  @keyframes in{from{transform:translateX(-12px);opacity:0}}
+  .modl{font-size:15px;color:#ffe08a;line-height:1.3;margin-bottom:6px}.modl b{color:#fff}.modl .vt{color:#4dff88}
+  .callc{display:none;text-align:center;flex-direction:column;justify-content:center;gap:10px}
+  body.calling > .card:not(.callc){display:none !important}
+  body:not(.calling) .callc{display:none !important}
+  body.calling .callc{display:flex;flex:1;animation:glow 1s ease-in-out infinite alternate}
+  @keyframes glow{to{box-shadow:0 0 40px hsla(var(--h),100%,55%,.8),inset 0 0 30px hsla(var(--h),100%,50%,.25)}}
+  .callc h2{margin:0;font-size:30px;color:#ffe08a;text-shadow:0 0 12px #ff9d00}
+  .callc .how{font-size:20px}.callc .how b{color:hsl(var(--h),100%,72%)}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{position:relative;border-radius:12px;background:rgba(255,255,255,.08);padding:8px 12px;display:flex;align-items:center;gap:10px;overflow:hidden}
+  .opt .bg{position:absolute;inset:0;width:0;background:linear-gradient(90deg,hsla(var(--h2),100%,55%,.45),hsla(var(--h),100%,55%,.25));transition:width .4s}
+  .opt>*:not(.bg){position:relative}
+  .opt .n{font-size:30px;color:#ffe08a;min-width:1.2em}.opt .t{font-size:24px;flex:1;text-align:left}.opt .t small{display:block;font-size:13px;opacity:.75;font-weight:700}
+  .opt .v{font-size:28px;color:#4dff88}.opt.lead{outline:3px solid #4dff88}
+  .callc .tm{font-size:16px;opacity:.85}
+  .off{font-size:12px;text-align:center;opacity:.6;letter-spacing:1px}
+
+  /* ---- modo franja: ventana ancha y baja (debajo del juego) ---- */
+  @media (min-aspect-ratio: 1/1){
+    :root{--u:min(1.3vh,.36vw)}
+    .head{display:none !important}
+    html{display:flex;align-items:center}
+    body{height:auto !important;width:100%}
+    body{flex-direction:row;gap:1.2vw;padding:calc(var(--u)*2.5) 1.2vw;align-items:stretch;justify-content:center}
+    .card{border-radius:calc(var(--u)*2.2);padding:calc(var(--u)*2.5) 1.2vw;display:flex;flex-direction:column;justify-content:center;min-width:0}
+    .head{flex:0 0 auto}
+    h1{font-size:calc(var(--u)*9);letter-spacing:calc(var(--u)*0.2)}
+    .sub{font-size:calc(var(--u)*4.6);letter-spacing:calc(var(--u)*0.3)}
+    .head .score{margin-top:calc(var(--u)*2);grid-template-columns:repeat(3,auto);gap:1.6vw}
+    .score b{font-size:calc(var(--u)*11)}.score span{font-size:calc(var(--u)*3.8);letter-spacing:calc(var(--u)*0.2)}
+    .likes{flex:1.15}
+    .tot{font-size:calc(var(--u)*7)}.tot b{font-size:calc(var(--u)*10)}
+    .bar{margin:calc(var(--u)*1.2) 0}.bar .t{font-size:calc(var(--u)*5);margin-bottom:calc(var(--u)*0.6)}.track{height:calc(var(--u)*3.6)}
+    .rules{flex:1.35;gap:calc(var(--u)*1.2);font-size:calc(var(--u)*5.2)}
+    .rule{white-space:nowrap}
+    .cmd{font-size:calc(var(--u)*4.6)}
+    .feedc{flex:.95}
+    .feed{font-size:calc(var(--u)*5);gap:calc(var(--u)*1.4)}.feed div:first-child{font-size:calc(var(--u)*5.8)}
+    .callc h2{font-size:calc(var(--u)*8)}.callc .how{font-size:calc(var(--u)*5.5)}.callc .tm{font-size:calc(var(--u)*4.4)}
+    .callc{gap:calc(var(--u)*1.5)} .opts{flex-direction:row;gap:1vw}.opt{flex:1;padding:calc(var(--u)*2) 1vw;border-radius:calc(var(--u)*2)}
+    .opt .n{font-size:calc(var(--u)*9)}.opt .t{font-size:calc(var(--u)*6.5)}.opt .t small{font-size:calc(var(--u)*3.8)}.opt .v{font-size:calc(var(--u)*9)}
+    .modl{font-size:calc(var(--u)*5);margin-bottom:calc(var(--u)*1.5)}
+    .feed div:nth-child(n+4){display:none}
+    .feed div{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+    .scorecard{display:none}
+    .off{position:fixed;bottom:calc(var(--u)*0.5);right:1vw;font-size:calc(var(--u)*3)}
+  }
+  @media (max-aspect-ratio: 1/1){ .head .score{display:none} }
+</style>
+</head>
+<body>
+  <div class="card head">
+    <h1>🐍 NEON SNAKE</h1>
+    <div class="sub">¡TÚ CONTROLAS LA PARTIDA!</div>
+    <div class="score">
+      <div class="w"><b class="vWins">0</b><span>VICTORIAS</span></div>
+      <div class="l"><b class="vLoss">0</b><span>DERROTAS</span></div>
+      <div class="s"><b class="vStreak">0</b><span>🔥 RACHA</span></div>
+    </div>
+  </div>
+
+  <div class="card score scorecard">
+    <div class="w"><b class="vWins">0</b><span>VICTORIAS</span></div>
+    <div class="l"><b class="vLoss">0</b><span>DERROTAS</span></div>
+    <div class="s"><b class="vStreak">0</b><span>🔥 RACHA</span></div>
+  </div>
+
+  <div class="card likes">
+    <div class="tot">❤️ <b id="likes">0</b> likes</div>
+    <div class="bar f1"><div class="t"><span>🎰 RULETA</span><i id="l100">faltan 100</i></div><div class="track"><div class="fill" id="b100"></div></div></div>
+    <div class="bar f2"><div class="t"><span>✨ LLUVIA</span><i id="l300">faltan 300</i></div><div class="track"><div class="fill" id="b300"></div></div></div>
+    <div class="bar f3"><div class="t"><span>✂️ TIJERAS</span><i id="l1000">faltan 1000</i></div><div class="track"><div class="fill" id="b1000"></div></div></div>
+  </div>
+
+  <div class="card rules">
+    <div class="rule"><span class="k">➕ Sígueme</span><span class="v">🌋 Terremoto</span></div>
+    <div class="rule"><span class="k">🌹 Rosa</span><span class="v">💀 Maldición</span></div>
+    <div class="rule"><span class="k">🔁 Comparte</span><span class="v">🎁 Sorpresa</span></div>
+    <div class="cmd">💬 Escribe en el chat: <b>turbo · lento · apagon · bloque · rival · bomba · portal · espejo · iman · ruleta · mascota</b></div>
+  </div>
+
+  <div class="card feedc">
+    <div class="modl" id="modl"></div>
+    <div class="feed" id="feed"><div>¡Esperando a que hagas algo! 👀</div></div>
+  </div>
+  <div class="card callc" id="callc">
+    <h2>🗳️ ¡ELIGE LA PRÓXIMA PARTIDA!</h2>
+    <div class="how">Escribe en el chat <b>1</b>, <b>2</b> o <b>3</b></div>
+    <div class="opts" id="opts"></div>
+    <div class="tm" id="ctm"></div>
+  </div>
+  <div class="off" id="off"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  let lastFeed = '', hue = 190;
+  const esc = t => String(t).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  function set(id, v){ const el = $(id); if (el.textContent !== String(v)) el.textContent = v; }
+  function tick(){
+    hue = (hue + 0.6) % 360;
+    document.documentElement.style.setProperty('--h', hue.toFixed(0));
+    document.documentElement.style.setProperty('--h2', ((hue + 110) % 360).toFixed(0));
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem('neonsnake_live') || 'null'); } catch(e){}
+    if (!d){ set('off', 'Abre el juego para ver los datos'); return; }
+    set('off', Date.now() - d.at > 5000 ? 'El juego está cerrado' : '');
+    for (const [c, v] of [['vWins', d.wins], ['vLoss', d.losses], ['vStreak', d.streak]]) document.querySelectorAll('.' + c).forEach(el => { if (el.textContent !== String(v)) el.textContent = v; });
+    set('likes', (d.likes || 0).toLocaleString('es'));
+    for (const n of [100, 300, 1000]){
+      const r = (d.likes || 0) % n;
+      $('b' + n).style.width = (100 * r / n) + '%';
+      set('l' + n, 'faltan ' + (n - r));
+    }
+    { let h = '';
+      if (d.mod) h += '🎲 <b>' + esc(d.mod) + '</b>';
+      if (d.vote && d.vote.length){ const best = Math.max(...d.vote.map(v => v.v));
+        h += (h ? ' · ' : '') + '🗳️ ' + d.vote.map(v => '<span' + (best > 0 && v.v === best ? ' class="vt"' : '') + '>' + v.n + ' ' + esc(v.t) + ' ' + v.v + '</span>').join(' · '); }
+      if ($('modl').innerHTML !== h) $('modl').innerHTML = h; }
+    const calling = Date.now() - d.at < 5000 && d.call > 0 && d.vote && d.vote.length;
+    document.body.classList.toggle('calling', !!calling);
+    if (calling){
+      const tot = d.vote.reduce((a, v) => a + v.v, 0), best = Math.max(...d.vote.map(v => v.v));
+      const h = d.vote.map(v => '<div class="opt' + (best > 0 && v.v === best ? ' lead' : '') + '"><div class="bg" style="width:' + (tot ? 100*v.v/tot : 0) + '%"></div><span class="n">' + v.n + '</span><span class="t">' + esc(v.t + ' ' + (v.nm || '')) + '<small>' + esc(v.d || '') + '</small></span><span class="v">' + v.v + '</span></div>').join('');
+      if ($('opts').innerHTML !== h) $('opts').innerHTML = h;
+      set('ctm', '⏱ ' + d.call + ' s · ¡un voto por persona!');
+    }
+    const fk = JSON.stringify(d.feed || []);
+    if (fk !== lastFeed && d.feed && d.feed.length){
+      lastFeed = fk;
+      $('feed').innerHTML = '';
+      for (const f of d.feed.slice(0, 5)){ const el = document.createElement('div'); el.textContent = f.t; $('feed').appendChild(el); }
+    }
+  }
+  tick(); setInterval(tick, 300);
+  window.addEventListener('storage', tick);
+})();
+</script>
+</body>
+</html>
