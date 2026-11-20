@@ -98,3 +98,5 @@ El chat vota la siguiente con `!snake 1`, `!snake 2` o `!snake 3` (un voto por p
 - **Jefe de verdad:** sus bloques duran 2,2 s y son mortales (muerte con zoom y cartel «⚔️ ¡EL JEFE LE DIO!»). Solo apunta donde TOP puede esquivarlos sin frenar en seco; si no hay sitio, el disparo falla. Con bloques en el tablero TOP no toma atajos. Sim: 1.252 disparos y 190 campos minados sin muertes injustas en partidas ganadoras.
 - **Sonidos** en la carpeta `sonidos/`: efectos del jefe a partir del banco CC0 [uisfx](https://github.com/romainsimon/uisfx) y un `perder.mp3` propio (ver `sonidos/LEEME.txt`).
 - **🎆 Despedida del directo:** tecla **Ç** (o botón en el panel): fuegos artificiales, resumen del directo (victorias, likes, rosas, follows), top 5 de los que más participaron y la corona; el bot se despide en el chat. Ç otra vez para quitarla.
+
+- **Panel por categorías:** el panel de stream se divide en secciones desplegables (Partida, Modificadores, Eventos de espectadores, Sonido, Directo y pantalla, Conexión y teclas). Recuerda cuáles dejaste abiertas.

@@ -49,6 +49,14 @@
     padding:7px 4px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer}
   #panel .btns button:hover{background:rgba(255,0,255,.25)}
   #panel #modBtns button.on{background:hsla(var(--h),100%,50%,.4);border-color:hsl(var(--h),100%,65%)}
+  #panel .sec{margin-top:6px;border:1px solid hsla(var(--h),100%,60%,.3);border-radius:9px;background:rgba(255,255,255,.03);padding:0 8px}
+  #panel .sec[open]{padding-bottom:8px;background:rgba(255,255,255,.05)}
+  #panel .sec summary{cursor:pointer;list-style:none;padding:7px 0;font-weight:700;color:#fff;display:flex;justify-content:space-between;align-items:center;user-select:none}
+  #panel .sec summary::-webkit-details-marker{display:none}
+  #panel .sec summary::after{content:'▸';color:hsl(var(--h),100%,65%);transition:transform .2s}
+  #panel .sec[open] summary::after{transform:rotate(90deg)}
+  #panel .sec .btns{margin-top:6px}
+  #panel .sec summary + label{margin-top:0}
   #panel .keys{margin-top:8px;color:#888;font-size:10.5px;line-height:1.5}
   #pad{position:fixed;right:14px;bottom:14px;width:156px;height:156px;z-index:4;display:none;opacity:.16}
   #pad button{position:absolute;width:52px;height:52px;border-radius:12px;border:1px solid #0ff;background:rgba(0,255,255,.08);
@@ -132,47 +140,63 @@
 
 <div id="panel">
   <h3>⚡ PANEL DE STREAM</h3>
-  <label>Velocidad inicial <span id="spsV"></span></label>
-  <input type="range" id="sps" min="4" max="40" step="1">
-  <label>Aumento por manzana <span id="incV"></span></label>
-  <input type="range" id="inc" min="0" max="0.5" step="0.01">
-  <label>Velocidad máxima <span id="maxSpsV"></span></label>
-  <input type="range" id="maxSps" min="10" max="200" step="1">
-  <label>Tamaño de cuadrícula <span id="gridV"></span></label>
-  <input type="range" id="grid" min="6" max="40" step="1">
-  <label>Meta (tablero lleno) <span id="goalPV"></span></label>
-  <input type="range" id="goalP" min="20" max="100" step="5">
-  <label>Victorias de TOP <span id="winRateV"></span></label>
-  <input type="range" id="winRate" min="0" max="100" step="5">
-  <label>Volumen <span id="volV"></span></label>
-  <input type="range" id="vol" min="0" max="100" step="1">
-  <label>🎲 Probar modificador <span id="modV"></span></label>
-  <div class="btns" id="modBtns"></div>
-  <div class="btns">
-    <button id="rainBtn">🍎 Lluvia (L)</button>
-    <button id="turboBtn">⚡ Turbo (T)</button>
-    <button id="megaBtn">⭐ Mega orbe (G)</button>
-    <button id="obstBtn">🧱 Obstáculo (O)</button>
-    <button id="wheelBtn">🎰 Ruleta (U)</button>
-    <button id="scisBtn">✂️ Tijeras (K)</button>
-    <button id="poisonBtn">🌹 Maldición rosa (V)</button>
-    <button id="shieldBtn">🛡️ Escudo (E)</button>
-    <button id="slowBtn">🐢 Lenta (C)</button>
-    <button id="darkBtn">🌑 Apagón (N)</button>
-    <button id="quakeBtn">🌋 Terremoto (Q)</button>
-    <button id="loseSndBtn">🎵 Sonido al perder</button>
-    <button id="loseSndClr">↩️ Sonido original</button>
-    <input type="file" id="loseFile" accept="audio/*" style="display:none">
-    <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
-    <button id="dnBtn">🌗 Día y noche: SÍ</button>
-    <button id="widgetBtn">🪟 Abrir widget de datos</button>
-    <button id="legendBtn">📋 Cartel espectadores (I)</button>
-    <button id="finaleBtn">🎆 Despedida del directo (Ç)</button>
-    <button id="resetHiBtn">🗑 Borrar marcador</button>
-  </div>
-  <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
-  <div class="keys" id="sbLast" style="word-break:break-all"></div>
-  <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · Ç: despedida del directo · M: sonido · R: reiniciar · F: pantalla completa</div>
+  <details class="sec" data-sec="partida"><summary>🎮 Partida</summary>
+    <label>Velocidad inicial <span id="spsV"></span></label>
+    <input type="range" id="sps" min="4" max="40" step="1">
+    <label>Aumento por manzana <span id="incV"></span></label>
+    <input type="range" id="inc" min="0" max="0.5" step="0.01">
+    <label>Velocidad máxima <span id="maxSpsV"></span></label>
+    <input type="range" id="maxSps" min="10" max="200" step="1">
+    <label>Tamaño de cuadrícula <span id="gridV"></span></label>
+    <input type="range" id="grid" min="6" max="40" step="1">
+    <label>Meta (tablero lleno) <span id="goalPV"></span></label>
+    <input type="range" id="goalP" min="20" max="100" step="5">
+    <label>Victorias de TOP <span id="winRateV"></span></label>
+    <input type="range" id="winRate" min="0" max="100" step="5">
+  </details>
+  <details class="sec" data-sec="mods"><summary>🎲 Modificadores</summary>
+    <label>Probar modificador <span id="modV"></span></label>
+    <div class="btns" id="modBtns"></div>
+  </details>
+  <details class="sec" data-sec="eventos"><summary>🎁 Eventos de espectadores</summary>
+    <div class="btns">
+      <button id="rainBtn">🍎 Lluvia (L)</button>
+      <button id="turboBtn">⚡ Turbo (T)</button>
+      <button id="megaBtn">⭐ Mega orbe (G)</button>
+      <button id="obstBtn">🧱 Obstáculo (O)</button>
+      <button id="wheelBtn">🎰 Ruleta (U)</button>
+      <button id="scisBtn">✂️ Tijeras (K)</button>
+      <button id="poisonBtn">🌹 Maldición rosa (V)</button>
+      <button id="shieldBtn">🛡️ Escudo (E)</button>
+      <button id="slowBtn">🐢 Lenta (C)</button>
+      <button id="darkBtn">🌑 Apagón (N)</button>
+      <button id="quakeBtn">🌋 Terremoto (Q)</button>
+    </div>
+  </details>
+  <details class="sec" data-sec="sonido"><summary>🔊 Sonido</summary>
+    <label>Volumen <span id="volV"></span></label>
+    <input type="range" id="vol" min="0" max="100" step="1">
+    <div class="btns">
+      <button id="loseSndBtn">🎵 Sonido al perder</button>
+      <button id="loseSndClr">↩️ Sonido original</button>
+      <input type="file" id="loseFile" accept="audio/*" style="display:none">
+    </div>
+  </details>
+  <details class="sec" data-sec="directo"><summary>📺 Directo y pantalla</summary>
+    <div class="btns">
+      <button id="chatBtn">💬 Mensajes al chat: SÍ</button>
+      <button id="dnBtn">🌗 Día y noche: SÍ</button>
+      <button id="widgetBtn">🪟 Abrir widget de datos</button>
+      <button id="legendBtn">📋 Cartel espectadores (I)</button>
+      <button id="finaleBtn">🎆 Despedida del directo (Ç)</button>
+      <button id="resetHiBtn">🗑 Borrar marcador</button>
+    </div>
+  </details>
+  <details class="sec" data-sec="conexion"><summary>🔌 Conexión y teclas</summary>
+    <div class="keys" id="sbStat">Streamer.bot: buscando…</div>
+    <div class="keys" id="sbLast" style="word-break:break-all"></div>
+    <div class="keys">Flechas / WASD: mover · B: TOP (automático) · H: ocultar panel<br>I: cartel · O: obstáculo · U: ruleta · K: tijeras · V: rosa · E: escudo · C: lenta · N: apagón · Q: terremoto<br>P / Esc: menú de pausa · Ç: despedida del directo · M: sonido · R: reiniciar · F: pantalla completa</div>
+  </details>
 </div>
 
 <div id="pad">
@@ -186,6 +210,15 @@
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
+/* ---------- panel por secciones: recuerda cuáles dejaste abiertas ---------- */
+(() => {
+  let open = {}; try{ open = JSON.parse(localStorage.getItem('neonsnake_panelSecs') || '{"partida":true}'); }catch(e){}
+  document.querySelectorAll('#panel details.sec').forEach(d => {
+    d.open = !!open[d.dataset.sec];
+    d.addEventListener('toggle', () => { open[d.dataset.sec] = d.open; try{ localStorage.setItem('neonsnake_panelSecs', JSON.stringify(open)); }catch(e){} });
+  });
+})();
+
 const cvs = $('c'), ctx = cvs.getContext('2d'), fx2 = $('fx2'), f2 = fx2.getContext('2d');
 const g1 = document.createElement('canvas'), g1x = g1.getContext('2d'); // glow 1/4
 const g2 = document.createElement('canvas'), g2x = g2.getContext('2d'); // glow 1/8
